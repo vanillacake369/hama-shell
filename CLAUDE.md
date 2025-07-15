@@ -98,6 +98,26 @@ HamaShell is a **session and connection manager** designed for developers who ne
 - [ ] Add comprehensive testing suite
 - [ ] Build installation and deployment scripts
 
+### Phase 5: CI/CD & Distribution
+- [ ] Set up GitHub Actions CI pipeline
+  - [ ] Automated testing on push/PR
+  - [ ] Cross-platform build validation (Linux, macOS, Windows)
+  - [ ] Go module security scanning
+  - [ ] Code quality checks (go fmt, go vet)
+- [ ] Implement automated release process
+  - [ ] Tag-based release automation
+  - [ ] Cross-platform binary generation
+  - [ ] GitHub Releases with binaries
+  - [ ] Automated release notes generation
+- [ ] Create distribution mechanisms
+  - [ ] Installation script for easy deployment
+  - [ ] Go module publishing
+  - [ ] Optional: Package manager integration (Homebrew, etc.)
+- [ ] Set up basic monitoring
+  - [ ] Build status badges
+  - [ ] Version tracking
+  - [ ] Download statistics
+
 ## Module Architecture
 
 ### Core Modules
@@ -155,7 +175,11 @@ hama-shell/
 ├── internal/              # Internal packages
 ├── examples/              # Example configurations
 ├── docs/                  # Documentation
-└── tests/                 # Test files
+├── tests/                 # Test files
+├── .github/
+│   └── workflows/         # CI/CD workflows
+├── scripts/               # Build and installation scripts
+└── .goreleaser.yml        # Release configuration
 ```
 
 ### Current State
