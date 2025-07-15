@@ -74,7 +74,7 @@ projects:
                   - command: "<next-step>"
                 parallel: <true|false>
 aliases:
-  - "myapp-prod": "myapp.production.alice.db-tunnel"
+  - myapp-prod: "myapp.production.alice.db-tunnel"
 global_settings:
   retries: <number>
   timeout: <seconds>
@@ -103,8 +103,8 @@ Here's the definition of each declaration.
       Whether this session can run concurrently (`true`) or must run sequentially (`false`).
 
 * **`aliases`**
-  An **array** of aliases on groups of shell commands, each declared via `- name: "<session-name>"` to that the developer can run:
-
+  An **array** of aliases on groups of shell commands
+  
 * **`global_settings`**
   Defaults applied across **all** projects, stages, and developers:
 

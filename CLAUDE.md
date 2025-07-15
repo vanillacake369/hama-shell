@@ -47,6 +47,120 @@ HamaShell is a **session and connection manager** designed for developers who ne
 - Environment variable resolution
 - Alias path resolution
 
+## Development Methodology
+
+### Test-Driven Development (TDD) Approach
+
+This project follows a strict TDD methodology to ensure code quality, maintainability, and reliability. **ALL new features must follow this process:**
+
+#### 1. Test/Implementation Planning Phase
+Before implementing any feature, create a detailed plan that includes:
+
+**Test Plan Structure:**
+```
+Feature: [Feature Name]
+Description: [Brief description of what the feature does]
+
+Test Cases:
+1. [Test Case 1] - [Expected behavior]
+2. [Test Case 2] - [Edge case or error condition]
+3. [Test Case 3] - [Integration test]
+
+Implementation Plan:
+1. [Step 1] - [What needs to be implemented]
+2. [Step 2] - [Dependencies or prerequisites]
+3. [Step 3] - [Integration points]
+
+Acceptance Criteria:
+- [ ] All unit tests pass
+- [ ] Integration tests pass
+- [ ] Code coverage > 80%
+- [ ] No linting errors
+- [ ] Documentation updated
+```
+
+#### 2. Review and Approval Process
+- **MANDATORY:** Present the test/implementation plan to the user for review
+- Wait for explicit approval before proceeding with implementation
+- Address any feedback or concerns raised during review
+- Only proceed to implementation after receiving approval
+
+#### 3. TDD Implementation Cycle
+Once approved, follow the Red-Green-Refactor cycle:
+
+**Red Phase:** Write failing tests first
+- Create comprehensive test cases that cover the planned functionality
+- Ensure tests fail initially (proving they're testing the right thing)
+- Include edge cases, error conditions, and boundary tests
+
+**Green Phase:** Implement minimal code to pass tests
+- Write the simplest code possible to make tests pass
+- Focus on functionality, not optimization
+- Ensure all tests pass before moving to refactor
+
+**Refactor Phase:** Improve code quality
+- Optimize performance and readability
+- Ensure code follows project conventions
+- Maintain passing tests throughout refactoring
+
+#### 4. Quality Gates
+Before considering a feature complete:
+- [ ] **Unit Tests:** All tests pass with >80% code coverage
+- [ ] **Integration Tests:** Feature works with existing systems
+- [ ] **Code Quality:** Pass `go fmt`, `go vet`, and any linters
+- [ ] **Documentation:** Update relevant documentation
+- [ ] **Performance:** No significant performance regression
+
+#### 5. Example TDD Activities
+
+**Feature Planning Activities:**
+- Write user stories and acceptance criteria
+- Design API interfaces and data structures
+- Plan test scenarios including happy path and edge cases
+- Identify integration points and dependencies
+- Create mock objects and test fixtures
+
+**Test Implementation Activities:**
+- Write unit tests for individual functions and methods
+- Create integration tests for component interactions
+- Design table-driven tests for multiple scenarios
+- Implement benchmarks for performance-critical code
+- Set up test fixtures and helper functions
+
+**Implementation Activities:**
+- Implement minimal code to pass each test
+- Follow Go best practices and project conventions
+- Handle errors gracefully with proper error messages
+- Add appropriate logging and monitoring
+- Ensure thread safety where needed
+
+**Refactoring Activities:**
+- Optimize algorithms and data structures
+- Improve code readability and maintainability
+- Extract common functionality into reusable components
+- Update documentation and comments
+- Verify performance benchmarks
+
+#### 6. Testing Strategy
+
+**Unit Tests:**
+- Test individual functions and methods in isolation
+- Use mocks for external dependencies
+- Cover all public APIs and critical internal functions
+- Include table-driven tests for multiple scenarios
+
+**Integration Tests:**
+- Test component interactions
+- Verify end-to-end workflows
+- Test with real (but controlled) external dependencies
+- Include CLI command integration tests
+
+**Performance Tests:**
+- Benchmark critical paths and algorithms
+- Test with realistic data sizes
+- Monitor memory usage and goroutine leaks
+- Set performance regression thresholds
+
 ## Development Commands
 
 ### Building and Running
@@ -57,9 +171,12 @@ HamaShell is a **session and connection manager** designed for developers who ne
 
 ### Testing and Code Quality
 
-- `go test` - Run tests (no tests currently exist)
-- `go fmt` - Format Go source code
-- `go vet` - Report likely mistakes in packages
+- `go test ./...` - Run all tests in the project
+- `go test -v ./...` - Run tests with verbose output
+- `go test -cover ./...` - Run tests with coverage report
+- `go test -bench=.` - Run benchmark tests
+- `go fmt ./...` - Format Go source code
+- `go vet ./...` - Report likely mistakes in packages
 - `go mod tidy` - Clean up module dependencies
 
 ### Module Management
@@ -67,56 +184,6 @@ HamaShell is a **session and connection manager** designed for developers who ne
 - `go mod init` - Initialize module (already done)
 - `go mod download` - Download module dependencies
 - `go get <package>` - Add new dependencies
-
-## TODO: Implementation Tasks
-
-### Phase 1: Core Infrastructure
-- [ ] Design and implement YAML configuration parser
-- [ ] Create session data structures (Project, Stage, Developer, Session)
-- [ ] Implement global alias registry and resolution
-- [ ] Build basic CLI command structure with cobra/cli library
-- [ ] Set up logging and error handling framework
-
-### Phase 2: Session Management
-- [ ] Implement session lifecycle management (start, stop, restart)
-- [ ] Create process management for SSH commands
-- [ ] Add session state persistence and recovery
-- [ ] Implement parallel session execution
-- [ ] Build session monitoring and health checks
-
-### Phase 3: Advanced Features
-- [ ] Add interactive CLI mode and dashboard/TUI
-- [ ] Implement comprehensive status reporting
-- [ ] Create alias management commands
-- [ ] Add configuration validation and testing
-- [ ] Build log management and viewing capabilities
-
-### Phase 4: Security & Operations
-- [ ] Implement secure environment variable handling
-- [ ] Add connection retry logic and error recovery
-- [ ] Create port forwarding management
-- [ ] Add comprehensive testing suite
-- [ ] Build installation and deployment scripts
-
-### Phase 5: CI/CD & Distribution
-- [ ] Set up GitHub Actions CI pipeline
-  - [ ] Automated testing on push/PR
-  - [ ] Cross-platform build validation (Linux, macOS, Windows)
-  - [ ] Go module security scanning
-  - [ ] Code quality checks (go fmt, go vet)
-- [ ] Implement automated release process
-  - [ ] Tag-based release automation
-  - [ ] Cross-platform binary generation
-  - [ ] GitHub Releases with binaries
-  - [ ] Automated release notes generation
-- [ ] Create distribution mechanisms
-  - [ ] Installation script for easy deployment
-  - [ ] Go module publishing
-  - [ ] Optional: Package manager integration (Homebrew, etc.)
-- [ ] Set up basic monitoring
-  - [ ] Build status badges
-  - [ ] Version tracking
-  - [ ] Download statistics
 
 ## Module Architecture
 
