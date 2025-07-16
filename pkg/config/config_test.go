@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,41 +58,50 @@ global_settings:
 		t.Fatalf("GetConfig failed: %v", err)
 	}
 
-	// Verify parsed config
-	if len(config.Projects) != 1 {
-		t.Errorf("Expected 1 project, got %d", len(config.Projects))
-	}
+	// Verify parsed config using testify assertions
+	assert.Len(t, config.Projects, 1, "Expected exactly 1 project")
+	assert.Equal(t, "myapp", config.Projects[0].Name, "Project name should be 'myapp'")
+	assert.Len(t, config.Projects[0].Stages, 2, "Expected exactly 2 stages")
 
-	if config.Projects[0].Name != "myapp" {
-		t.Errorf("Expected project name 'myapp', got '%s'", config.Projects[0].Name)
-	}
+	// Verify global settings
+	assert.Equal(t, 3, config.GlobalSettings.Retries, "Retries should be 3")
+	assert.Equal(t, 30, config.GlobalSettings.Timeout, "Timeout should be 30")
+	assert.True(t, config.GlobalSettings.AutoRestart, "AutoRestart should be true")
 
-	if len(config.Projects[0].Stages) != 2 {
-		t.Errorf("Expected 2 stages, got %d", len(config.Projects[0].Stages))
-	}
+	// Verify aliases
+	assert.Equal(t, "myapp.prod.bob.backend", config.Aliases.MyAppProd, "Alias should match expected value")
 
-	if config.GlobalSettings.Retries != 3 {
-		t.Errorf("Expected retries 3, got %d", config.GlobalSettings.Retries)
-	}
+	// Verify stage details
+	devStage := config.Projects[0].Stages[0]
+	prodStage := config.Projects[0].Stages[1]
 
-	if config.GlobalSettings.Timeout != 30 {
-		t.Errorf("Expected timeout 30, got %d", config.GlobalSettings.Timeout)
-	}
+	assert.Equal(t, "dev", devStage.Name, "First stage should be 'dev'")
+	assert.Equal(t, "prod", prodStage.Name, "Second stage should be 'prod'")
 
-	if !config.GlobalSettings.AutoRestart {
-		t.Errorf("Expected auto_restart true, got %v", config.GlobalSettings.AutoRestart)
-	}
+	// Verify developers and sessions
+	assert.Len(t, devStage.Developers, 1, "Dev stage should have 1 developer")
+	assert.Equal(t, "alice", devStage.Developers[0].Name, "Dev developer should be 'alice'")
+	assert.Len(t, devStage.Developers[0].Sessions, 1, "Alice should have 1 session")
 
-	if config.Aliases.MyAppProd != "myapp.prod.bob.backend" {
-		t.Errorf("Expected alias 'myapp.prod.bob.backend', got '%s'", config.Aliases.MyAppProd)
-	}
+	aliceSession := devStage.Developers[0].Sessions[0]
+	assert.Equal(t, "frontend", aliceSession.Name, "Session name should be 'frontend'")
+	assert.Equal(t, "Run frontend development server", aliceSession.Description, "Session description should match")
+	assert.False(t, aliceSession.Parallel, "Frontend session should not be parallel")
+	assert.Len(t, aliceSession.Steps, 1, "Frontend session should have 1 step")
+	assert.Equal(t, "npm start", aliceSession.Steps[0].Command, "Command should be 'npm start'")
+
+	// Verify prod stage
+	assert.Len(t, prodStage.Developers, 1, "Prod stage should have 1 developer")
+	assert.Equal(t, "bob", prodStage.Developers[0].Name, "Prod developer should be 'bob'")
+
+	bobSession := prodStage.Developers[0].Sessions[0]
+	assert.Equal(t, "backend", bobSession.Name, "Session name should be 'backend'")
+	assert.True(t, bobSession.Parallel, "Backend session should be parallel")
 }
 
 func TestGetConfigNonexistentFile(t *testing.T) {
 	_, err := GetConfig("/nonexistent/file.yaml")
-	if err == nil {
-		t.Error("Expected error for nonexistent file, got nil")
-	}
+	assert.Error(t, err, "Should return error for nonexistent file")
 }
 
 func TestGetConfigInvalidYAML(t *testing.T) {
@@ -117,7 +127,6 @@ projects:
 	}
 
 	_, err = GetConfig(configFile)
-	if err == nil {
-		t.Error("Expected error for invalid YAML, got nil")
-	}
+	assert.Error(t, err, "Should return error for invalid YAML")
+	assert.Contains(t, err.Error(), "yaml", "Error should mention YAML parsing issue")
 }
