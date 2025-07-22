@@ -1,0 +1,138 @@
+# HamaShell Configuration
+# Usage: hama-shell ${project}.${stage}.${service}
+# Example: hama-shell myapp.dev.db
+
+projects:
+  myapp:
+    description: "Main application project"
+    stages:
+      dev:
+        description: "Development environment"
+        services:
+          db:
+            description: "PostgreSQL database connection"
+            host: "dev-db.myapp.com"
+            user: "${DB_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+            tunnel: "5432:localhost:5432"
+          
+          server:
+            description: "Application server"
+            host: "dev-app.myapp.com"
+            user: "${APP_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+          
+          jenkins:
+            description: "CI/CD Jenkins server"
+            host: "jenkins.myapp.com"
+            user: "jenkins"
+            key: "${JENKINS_KEY}"
+            port: 8080
+            tunnel: "8080:localhost:8080"
+          
+          bastion:
+            description: "Bastion host for secure access"
+            host: "bastion.dev.myapp.com"
+            user: "${BASTION_USER}"
+            key: "${SSH_KEY_PATH}"
+            
+      staging:
+        description: "Staging environment"
+        services:
+          db:
+            description: "Staging database"
+            host: "staging-db.myapp.com"
+            user: "${DB_USER}"
+            key: "${SSH_KEY_PATH}"
+            tunnel: "5432:staging-db:5432"
+          
+          server:
+            description: "Staging application server"
+            steps:
+              - command: "ssh -i ${SSH_KEY_PATH} ${APP_USER}@bastion.staging.myapp.com"
+              - command: "ssh staging-app-01"
+          
+          jenkins:
+            description: "Staging Jenkins"
+            host: "jenkins.staging.myapp.com"
+            user: "jenkins"
+            key: "${JENKINS_KEY}"
+            tunnel: "8080:localhost:8080"
+            
+      prod:
+        description: "Production environment"
+        services:
+          db:
+            description: "Production database (read-only access)"
+            steps:
+              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.myapp.com"
+              - command: "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy"
+            parallel: false
+          
+          server:
+            description: "Production application server"
+            host: "prod-app.myapp.com"
+            user: "${PROD_USER}"
+            key: "${PROD_SSH_KEY}"
+            
+          jenkins:
+            description: "Production Jenkins"
+            host: "jenkins.prod.myapp.com"
+            user: "jenkins"
+            key: "${JENKINS_PROD_KEY}"
+            tunnel: "8080:localhost:8080"
+
+  ecommerce:
+    description: "E-commerce platform"
+    stages:
+      dev:
+        services:
+          db:
+            description: "MySQL database"
+            host: "mysql.dev.ecommerce.com"
+            user: "${MYSQL_USER}"
+            key: "${SSH_KEY_PATH}"
+            tunnel: "3306:localhost:3306"
+          
+          redis:
+            description: "Redis cache server"
+            host: "redis.dev.ecommerce.com"
+            user: "${REDIS_USER}"
+            key: "${SSH_KEY_PATH}"
+            tunnel: "6379:localhost:6379"
+          
+          api:
+            description: "API server"
+            host: "api.dev.ecommerce.com"
+            user: "${API_USER}"
+            key: "${SSH_KEY_PATH}"
+            
+      prod:
+        services:
+          db:
+            description: "Production MySQL cluster"
+            host: "mysql-master.prod.ecommerce.com"
+            user: "${MYSQL_PROD_USER}"
+            key: "${PROD_SSH_KEY}"
+            tunnel: "3306:mysql-master:3306"
+          
+          redis:
+            description: "Production Redis cluster"
+            host: "redis-cluster.prod.ecommerce.com"
+            user: "${REDIS_PROD_USER}"
+            key: "${PROD_SSH_KEY}"
+            tunnel: "6379:redis-master:6379"
+
+# Global settings applied to all connections
+global_settings:
+  timeout: 30
+  retries: 3
+  auto_restart: true
+  log_level: "info"
+  ssh_options:
+    - "StrictHostKeyChecking=no"
+    - "UserKnownHostsFile=/dev/null"
+    - "ServerAliveInterval=60"
+
