@@ -16,29 +16,36 @@ func TestGetConfig(t *testing.T) {
 
 	yamlContent := `
 projects:
-  - name: myapp
+  myapp:
+    description: "Main application project"
     stages:
-      - name: dev
-        developers:
-          - name: alice
-            sessions:
-              - name: frontend
-                description: Run frontend development server
-                steps:
-                  - command: npm start
-                parallel: false
-      - name: prod
-        developers:
-          - name: bob
-            sessions:
-              - name: backend
-                description: Deploy backend service
-                steps:
-                  - command: docker deploy
-                parallel: true
+      dev:
+        description: "Development environment"
+        services:
+          db:
+            description: "PostgreSQL database connection"
+            host: "dev-db.myapp.com"
+            user: "dbuser"
+            key: "/path/to/ssh/key"
+            port: 22
+            tunnel: "5432:localhost:5432"
+          server:
+            description: "Application server"
+            host: "dev-app.myapp.com"
+            user: "appuser"
+            key: "/path/to/ssh/key"
+            port: 22
+      prod:
+        description: "Production environment"
+        services:
+          db:
+            description: "Production database"
+            steps:
+              - command: "ssh -i /path/to/key user@bastion.prod.com"
+              - command: "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy"
 
 aliases:
-  myapp-prod: myapp.prod.bob.backend
+  myapp-prod-db: "myapp.prod.db"
 
 global_settings:
   retries: 3
@@ -60,8 +67,10 @@ global_settings:
 
 	// Verify parsed config using testify assertions
 	assert.Len(t, config.Projects, 1, "Expected exactly 1 project")
-	assert.Equal(t, "myapp", config.Projects[0].Name, "Project name should be 'myapp'")
-	assert.Len(t, config.Projects[0].Stages, 2, "Expected exactly 2 stages")
+	myappProject, exists := config.Projects["myapp"]
+	assert.True(t, exists, "Project 'myapp' should exist")
+	assert.Equal(t, "Main application project", myappProject.Description, "Project description should match")
+	assert.Len(t, myappProject.Stages, 2, "Expected exactly 2 stages")
 
 	// Verify global settings
 	assert.Equal(t, 3, config.GlobalSettings.Retries, "Retries should be 3")
@@ -69,34 +78,45 @@ global_settings:
 	assert.True(t, config.GlobalSettings.AutoRestart, "AutoRestart should be true")
 
 	// Verify aliases
-	assert.Equal(t, "myapp.prod.bob.backend", config.Aliases.MyAppProd, "Alias should match expected value")
+	assert.Equal(t, "myapp.prod.db", config.Aliases["myapp-prod-db"], "Alias should match expected value")
 
 	// Verify stage details
-	devStage := config.Projects[0].Stages[0]
-	prodStage := config.Projects[0].Stages[1]
+	devStage, devExists := myappProject.Stages["dev"]
+	prodStage, prodExists := myappProject.Stages["prod"]
+	assert.True(t, devExists, "Dev stage should exist")
+	assert.True(t, prodExists, "Prod stage should exist")
+	assert.Equal(t, "Development environment", devStage.Description, "Dev stage description should match")
+	assert.Equal(t, "Production environment", prodStage.Description, "Prod stage description should match")
 
-	assert.Equal(t, "dev", devStage.Name, "First stage should be 'dev'")
-	assert.Equal(t, "prod", prodStage.Name, "Second stage should be 'prod'")
+	// Verify dev services
+	assert.Len(t, devStage.Services, 2, "Dev stage should have 2 services")
+	dbService, dbExists := devStage.Services["db"]
+	serverService, serverExists := devStage.Services["server"]
+	assert.True(t, dbExists, "DB service should exist")
+	assert.True(t, serverExists, "Server service should exist")
 
-	// Verify developers and sessions
-	assert.Len(t, devStage.Developers, 1, "Dev stage should have 1 developer")
-	assert.Equal(t, "alice", devStage.Developers[0].Name, "Dev developer should be 'alice'")
-	assert.Len(t, devStage.Developers[0].Sessions, 1, "Alice should have 1 session")
+	// Verify DB service details
+	assert.Equal(t, "PostgreSQL database connection", dbService.Description, "DB service description should match")
+	assert.Equal(t, "dev-db.myapp.com", dbService.Host, "DB host should match")
+	assert.Equal(t, "dbuser", dbService.User, "DB user should match")
+	assert.Equal(t, "/path/to/ssh/key", dbService.Key, "DB key should match")
+	assert.Equal(t, 22, dbService.Port, "DB port should be 22")
+	assert.Equal(t, "5432:localhost:5432", dbService.Tunnel, "DB tunnel should match")
 
-	aliceSession := devStage.Developers[0].Sessions[0]
-	assert.Equal(t, "frontend", aliceSession.Name, "Session name should be 'frontend'")
-	assert.Equal(t, "Run frontend development server", aliceSession.Description, "Session description should match")
-	assert.False(t, aliceSession.Parallel, "Frontend session should not be parallel")
-	assert.Len(t, aliceSession.Steps, 1, "Frontend session should have 1 step")
-	assert.Equal(t, "npm start", aliceSession.Steps[0].Command, "Command should be 'npm start'")
+	// Verify server service details
+	assert.Equal(t, "Application server", serverService.Description, "Server service description should match")
+	assert.Equal(t, "dev-app.myapp.com", serverService.Host, "Server host should match")
+	assert.Equal(t, "appuser", serverService.User, "Server user should match")
+	assert.Equal(t, "/path/to/ssh/key", serverService.Key, "Server key should match")
+	assert.Equal(t, 22, serverService.Port, "Server port should be 22")
 
-	// Verify prod stage
-	assert.Len(t, prodStage.Developers, 1, "Prod stage should have 1 developer")
-	assert.Equal(t, "bob", prodStage.Developers[0].Name, "Prod developer should be 'bob'")
-
-	bobSession := prodStage.Developers[0].Sessions[0]
-	assert.Equal(t, "backend", bobSession.Name, "Session name should be 'backend'")
-	assert.True(t, bobSession.Parallel, "Backend session should be parallel")
+	// Verify prod stage with steps
+	prodDbService, prodDbExists := prodStage.Services["db"]
+	assert.True(t, prodDbExists, "Prod DB service should exist")
+	assert.Equal(t, "Production database", prodDbService.Description, "Prod DB description should match")
+	assert.Len(t, prodDbService.Steps, 2, "Prod DB should have 2 steps")
+	assert.Equal(t, "ssh -i /path/to/key user@bastion.prod.com", prodDbService.Steps[0].Command, "First step command should match")
+	assert.Equal(t, "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy", prodDbService.Steps[1].Command, "Second step command should match")
 }
 
 func TestGetConfigNonexistentFile(t *testing.T) {
@@ -111,14 +131,14 @@ func TestGetConfigInvalidYAML(t *testing.T) {
 
 	invalidYAML := `
 projects:
-  - name: myapp
+  myapp:
+    description: "Main application project"
     stages:
-      - name: dev
-        developers:
-          - name: alice
-            sessions:
-              - name: frontend
-                description: "unclosed quote
+      dev:
+        description: "Development environment"
+        services:
+          db:
+            description: "unclosed quote
 `
 
 	err := os.WriteFile(configFile, []byte(invalidYAML), 0644)
@@ -129,4 +149,71 @@ projects:
 	_, err = GetConfig(configFile)
 	assert.Error(t, err, "Should return error for invalid YAML")
 	assert.Contains(t, err.Error(), "yaml", "Error should mention YAML parsing issue")
+}
+
+func TestExampleYAML(t *testing.T) {
+	// Test that the example.yaml file can be parsed correctly
+	config, err := GetConfig("../../example.yaml")
+	if err != nil {
+		t.Fatalf("Failed to parse example.yaml: %v", err)
+	}
+
+	// Verify we have the expected projects
+	assert.Len(t, config.Projects, 2, "Expected exactly 2 projects in example.yaml")
+
+	// Verify myapp project
+	myappProject, exists := config.Projects["myapp"]
+	assert.True(t, exists, "Project 'myapp' should exist")
+	assert.Equal(t, "Main application project", myappProject.Description, "myapp description should match")
+	assert.Len(t, myappProject.Stages, 3, "myapp should have 3 stages")
+
+	// Verify myapp dev stage
+	devStage, devExists := myappProject.Stages["dev"]
+	assert.True(t, devExists, "myapp dev stage should exist")
+	assert.Equal(t, "Development environment", devStage.Description, "dev stage description should match")
+	assert.Len(t, devStage.Services, 4, "dev stage should have 4 services")
+
+	// Verify specific services
+	dbService, dbExists := devStage.Services["db"]
+	assert.True(t, dbExists, "db service should exist")
+	assert.Equal(t, "PostgreSQL database connection", dbService.Description, "db service description should match")
+	assert.Equal(t, "dev-db.myapp.com", dbService.Host, "db host should match")
+	assert.Equal(t, "${DB_USER}", dbService.User, "db user should use env var")
+	assert.Equal(t, "${SSH_KEY_PATH}", dbService.Key, "db key should use env var")
+	assert.Equal(t, 22, dbService.Port, "db port should be 22")
+	assert.Equal(t, "5432:localhost:5432", dbService.Tunnel, "db tunnel should match")
+
+	jenkinsService, jenkinsExists := devStage.Services["jenkins"]
+	assert.True(t, jenkinsExists, "jenkins service should exist")
+	assert.Equal(t, "CI/CD Jenkins server", jenkinsService.Description, "jenkins description should match")
+	assert.Equal(t, "jenkins.myapp.com", jenkinsService.Host, "jenkins host should match")
+	assert.Equal(t, 8080, jenkinsService.Port, "jenkins port should be 8080")
+
+	// Verify ecommerce project
+	ecomProject, ecomExists := config.Projects["ecommerce"]
+	assert.True(t, ecomExists, "Project 'ecommerce' should exist")
+	assert.Equal(t, "E-commerce platform project", ecomProject.Description, "ecommerce description should match")
+	assert.Len(t, ecomProject.Stages, 2, "ecommerce should have 2 stages")
+
+	// Verify production services with steps
+	prodStage, prodExists := myappProject.Stages["prod"]
+	assert.True(t, prodExists, "prod stage should exist")
+	prodDbService, prodDbExists := prodStage.Services["db"]
+	assert.True(t, prodDbExists, "prod db service should exist")
+	assert.Equal(t, "Production database via bastion", prodDbService.Description, "prod db description should match")
+	assert.Len(t, prodDbService.Steps, 2, "prod db should have 2 steps")
+	assert.Equal(t, "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com", prodDbService.Steps[0].Command, "first step should match")
+	assert.Equal(t, "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy", prodDbService.Steps[1].Command, "second step should match")
+
+	// Verify aliases
+	assert.Len(t, config.Aliases, 4, "Should have 4 aliases")
+	assert.Equal(t, "myapp.dev.db", config.Aliases["myapp-dev-db"], "myapp-dev-db alias should match")
+	assert.Equal(t, "myapp.prod.db", config.Aliases["myapp-prod-db"], "myapp-prod-db alias should match")
+	assert.Equal(t, "ecommerce.dev.api", config.Aliases["ecom-dev-api"], "ecom-dev-api alias should match")
+	assert.Equal(t, "ecommerce.dev.mongodb", config.Aliases["ecom-mongo"], "ecom-mongo alias should match")
+
+	// Verify global settings
+	assert.Equal(t, 30, config.GlobalSettings.Timeout, "Timeout should be 30")
+	assert.Equal(t, 3, config.GlobalSettings.Retries, "Retries should be 3")
+	assert.True(t, config.GlobalSettings.AutoRestart, "AutoRestart should be true")
 }

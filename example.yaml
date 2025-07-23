@@ -1,0 +1,125 @@
+# HamaShell Configuration Example
+# This file demonstrates the project.stage.service pattern for managing SSH connections
+
+projects:
+  myapp:
+    description: "Main application project"
+    stages:
+      dev:
+        description: "Development environment"
+        services:
+          db:
+            description: "PostgreSQL database connection"
+            host: "dev-db.myapp.com"
+            user: "${DB_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+            tunnel: "5432:localhost:5432"
+          
+          server:
+            description: "Application server"
+            host: "dev-app.myapp.com"
+            user: "${APP_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+          
+          jenkins:
+            description: "CI/CD Jenkins server"
+            host: "jenkins.myapp.com"
+            user: "jenkins"
+            key: "${JENKINS_KEY}"
+            port: 8080
+            tunnel: "8080:localhost:8080"
+          
+          redis:
+            description: "Redis cache server"
+            host: "dev-redis.myapp.com"
+            user: "${REDIS_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+            tunnel: "6379:localhost:6379"
+            
+      staging:
+        description: "Staging environment"
+        services:
+          db:
+            description: "Staging database"
+            host: "staging-db.myapp.com"
+            user: "${DB_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+            tunnel: "5432:localhost:5432"
+          
+          server:
+            description: "Staging application server"
+            host: "staging-app.myapp.com"
+            user: "${APP_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+            
+      prod:
+        description: "Production environment"
+        services:
+          db:
+            description: "Production database via bastion"
+            steps:
+              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com"
+              - command: "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy"
+          
+          server:
+            description: "Production application server"
+            steps:
+              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com"
+              - command: "ssh ${APP_USER}@prod-app-internal"
+
+  ecommerce:
+    description: "E-commerce platform project"
+    stages:
+      dev:
+        description: "Development environment"
+        services:
+          api:
+            description: "API server"
+            host: "dev-api.ecommerce.com"
+            user: "${API_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+            tunnel: "3000:localhost:3000"
+          
+          mongodb:
+            description: "MongoDB database"
+            host: "dev-mongo.ecommerce.com"
+            user: "${MONGO_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+            tunnel: "27017:localhost:27017"
+          
+          elasticsearch:
+            description: "Elasticsearch cluster"
+            host: "dev-es.ecommerce.com"
+            user: "${ES_USER}"
+            key: "${SSH_KEY_PATH}"
+            port: 22
+            tunnel: "9200:localhost:9200"
+      
+      prod:
+        description: "Production environment"
+        services:
+          api:
+            description: "Production API cluster"
+            steps:
+              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.ecommerce.com"
+              - command: "ssh ${API_USER}@prod-api-lb"
+
+# Global aliases for quick access
+aliases:
+  myapp-dev-db: "myapp.dev.db"
+  myapp-prod-db: "myapp.prod.db"
+  ecom-dev-api: "ecommerce.dev.api"
+  ecom-mongo: "ecommerce.dev.mongodb"
+
+# Global configuration settings
+global_settings:
+  timeout: 30
+  retries: 3
+  auto_restart: true

@@ -11,45 +11,37 @@ import (
 // Config represents the top-level YAML configuration
 // pulled from file into Go structs.
 type Config struct {
-	Projects       []Project      `yaml:"projects"`
-	Aliases        Aliases        `yaml:"aliases"`
-	GlobalSettings GlobalSettings `yaml:"global_settings"`
+	Projects       map[string]Project `yaml:"projects"`
+	Aliases        map[string]string  `yaml:"aliases,omitempty"`
+	GlobalSettings GlobalSettings     `yaml:"global_settings"`
 }
 
 // Project groups stages under a project name.
 type Project struct {
-	Name   string  `yaml:"name"`
-	Stages []Stage `yaml:"stages"`
+	Description string           `yaml:"description"`
+	Stages      map[string]Stage `yaml:"stages"`
 }
 
 // Stage represents a deployment or build stage within a project.
 type Stage struct {
-	Name       string      `yaml:"name"`
-	Developers []Developer `yaml:"developers"`
+	Description string             `yaml:"description,omitempty"`
+	Services    map[string]Service `yaml:"services"`
 }
 
-// Developer lists sessions they are responsible for.
-type Developer struct {
-	Name     string    `yaml:"name"`
-	Sessions []Session `yaml:"sessions"`
-}
-
-// Session defines a set of steps (commands) to run, optionally in parallel.
-type Session struct {
-	Name        string `yaml:"name"`
+// Service defines connection details for a specific service.
+type Service struct {
 	Description string `yaml:"description"`
-	Steps       []Step `yaml:"steps"`
-	Parallel    bool   `yaml:"parallel"`
+	Host        string `yaml:"host,omitempty"`
+	User        string `yaml:"user,omitempty"`
+	Key         string `yaml:"key,omitempty"`
+	Port        int    `yaml:"port,omitempty"`
+	Tunnel      string `yaml:"tunnel,omitempty"`
+	Steps       []Step `yaml:"steps,omitempty"`
 }
 
 // Step is a single shell or SSH command to execute within a session.
 type Step struct {
 	Command string `yaml:"command"`
-}
-
-// Aliases maps friendly names to full session identifiers or endpoints.
-type Aliases struct {
-	MyAppProd string `yaml:"myapp-prod"`
 }
 
 // GlobalSettings configures retry logic, timeouts, and auto-restart behavior.
