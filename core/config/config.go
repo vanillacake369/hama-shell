@@ -31,13 +31,7 @@ type Stage struct {
 // Service defines connection details for a specific service.
 type Service struct {
 	Description string   `yaml:"description"`
-	Command     []string `yaml:"command,omitempty"`
-	Steps       []Step   `yaml:"steps,omitempty"`
-}
-
-// Step is a single shell or SSH command to execute within a session.
-type Step struct {
-	Command string `yaml:"command"`
+	Command     []string `yaml:"command"`
 }
 
 // GlobalSettings configures retry logic, timeouts, and auto-restart behavior.

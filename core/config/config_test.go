@@ -34,8 +34,10 @@ projects:
           db:
             description: "Production database"
             steps:
-              - command: "ssh -i /path/to/key user@bastion.prod.com"
-              - command: "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy"
+              - command: 
+                  - "ssh -i /path/to/key user@bastion.prod.com"
+              - command: 
+                  - "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy"
 
 aliases:
   myapp-prod-db: "myapp.prod.db"
@@ -103,8 +105,10 @@ global_settings:
 	assert.True(t, prodDbExists, "Prod DB service should exist")
 	assert.Equal(t, "Production database", prodDbService.Description, "Prod DB description should match")
 	assert.Len(t, prodDbService.Steps, 2, "Prod DB should have 2 steps")
-	assert.Equal(t, "ssh -i /path/to/key user@bastion.prod.com", prodDbService.Steps[0].Command, "First step command should match")
-	assert.Equal(t, "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy", prodDbService.Steps[1].Command, "Second step command should match")
+	assert.Len(t, prodDbService.Steps[0].Commands, 1, "First step should have 1 command")
+	assert.Equal(t, "ssh -i /path/to/key user@bastion.prod.com", prodDbService.Steps[0].Commands[0], "First step command should match")
+	assert.Len(t, prodDbService.Steps[1].Commands, 1, "Second step should have 1 command")
+	assert.Equal(t, "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy", prodDbService.Steps[1].Commands[0], "Second step command should match")
 }
 
 func TestGetConfigNonexistentFile(t *testing.T) {
@@ -137,6 +141,92 @@ projects:
 	_, err = GetConfig(configFile)
 	assert.Error(t, err, "Should return error for invalid YAML")
 	assert.Contains(t, err.Error(), "yaml", "Error should mention YAML parsing issue")
+}
+
+func TestMultipleCommandsInStep(t *testing.T) {
+	// Create a temporary YAML file with multiple commands in a step
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "multi_command_config.yaml")
+
+	yamlContent := `
+projects:
+  testapp:
+    description: "Test application with multiple commands per step"
+    stages:
+      dev:
+        description: "Development environment"
+        services:
+          complex:
+            description: "Complex service with multiple commands per step"
+            steps:
+              - command:
+                  - "echo 'Starting setup...'"
+                  - "mkdir -p /tmp/testdir"
+                  - "cd /tmp/testdir"
+              - command:
+                  - "ssh -i /path/to/key user@bastion.com"
+                  - "export ENV_VAR=value"
+                  - "ssh -L 5432:db:5432 user@internal-db"
+
+aliases:
+  test-complex: "testapp.dev.complex"
+
+global_settings:
+  retries: 2
+  timeout: 60
+  auto_restart: false
+`
+
+	// Write test YAML content to file
+	err := os.WriteFile(configFile, []byte(yamlContent), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config file: %v", err)
+	}
+
+	// Test GetConfig function
+	config, err := GetConfig(configFile)
+	if err != nil {
+		t.Fatalf("GetConfig failed: %v", err)
+	}
+
+	// Verify parsed config
+	assert.Len(t, config.Projects, 1, "Expected exactly 1 project")
+	testappProject, exists := config.Projects["testapp"]
+	assert.True(t, exists, "Project 'testapp' should exist")
+	assert.Equal(t, "Test application with multiple commands per step", testappProject.Description, "Project description should match")
+
+	// Verify dev stage
+	devStage, devExists := testappProject.Stages["dev"]
+	assert.True(t, devExists, "Dev stage should exist")
+	assert.Equal(t, "Development environment", devStage.Description, "Dev stage description should match")
+
+	// Verify complex service
+	complexService, complexExists := devStage.Services["complex"]
+	assert.True(t, complexExists, "Complex service should exist")
+	assert.Equal(t, "Complex service with multiple commands per step", complexService.Description, "Complex service description should match")
+	assert.Len(t, complexService.Steps, 2, "Complex service should have 2 steps")
+
+	// Verify first step with multiple commands
+	firstStep := complexService.Steps[0]
+	assert.Len(t, firstStep.Commands, 3, "First step should have 3 commands")
+	assert.Equal(t, "echo 'Starting setup...'", firstStep.Commands[0], "First command should match")
+	assert.Equal(t, "mkdir -p /tmp/testdir", firstStep.Commands[1], "Second command should match")
+	assert.Equal(t, "cd /tmp/testdir", firstStep.Commands[2], "Third command should match")
+
+	// Verify second step with multiple commands
+	secondStep := complexService.Steps[1]
+	assert.Len(t, secondStep.Commands, 3, "Second step should have 3 commands")
+	assert.Equal(t, "ssh -i /path/to/key user@bastion.com", secondStep.Commands[0], "First command of second step should match")
+	assert.Equal(t, "export ENV_VAR=value", secondStep.Commands[1], "Second command of second step should match")
+	assert.Equal(t, "ssh -L 5432:db:5432 user@internal-db", secondStep.Commands[2], "Third command of second step should match")
+
+	// Verify alias
+	assert.Equal(t, "testapp.dev.complex", config.Aliases["test-complex"], "Alias should match expected value")
+
+	// Verify global settings
+	assert.Equal(t, 2, config.GlobalSettings.Retries, "Retries should be 2")
+	assert.Equal(t, 60, config.GlobalSettings.Timeout, "Timeout should be 60")
+	assert.False(t, config.GlobalSettings.AutoRestart, "AutoRestart should be false")
 }
 
 func TestExampleYAML(t *testing.T) {
@@ -187,8 +277,10 @@ func TestExampleYAML(t *testing.T) {
 	assert.True(t, prodDbExists, "prod db service should exist")
 	assert.Equal(t, "Production database via bastion", prodDbService.Description, "prod db description should match")
 	assert.Len(t, prodDbService.Steps, 2, "prod db should have 2 steps")
-	assert.Equal(t, "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com", prodDbService.Steps[0].Command, "first step should match")
-	assert.Equal(t, "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy", prodDbService.Steps[1].Command, "second step should match")
+	assert.Len(t, prodDbService.Steps[0].Commands, 1, "first step should have 1 command")
+	assert.Equal(t, "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com", prodDbService.Steps[0].Commands[0], "first step should match")
+	assert.Len(t, prodDbService.Steps[1].Commands, 1, "second step should have 1 command")
+	assert.Equal(t, "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy", prodDbService.Steps[1].Commands[0], "second step should match")
 
 	// Verify aliases
 	assert.Len(t, config.Aliases, 4, "Should have 4 aliases")

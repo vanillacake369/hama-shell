@@ -12,7 +12,9 @@ projects:
             description: "PostgreSQL database connection"
             command:
               - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-          
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
+
           server:
             description: "Application server"
             command:
@@ -21,75 +23,6 @@ projects:
             description: "CI/CD Jenkins server"
             command:
               - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-          
-          redis:
-            description: "Redis cache server"
-            command:
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-            
-      staging:
-        description: "Staging environment"
-        services:
-          db:
-            description: "Staging database"
-            command:
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-          
-          server:
-            description: "Staging application server"
-            command:
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-      prod:
-        description: "Production environment"
-        services:
-          db:
-            description: "Production database via bastion"
-            steps:
-              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com"
-              - command: "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy"
-          
-          server:
-            description: "Production application server"
-            steps:
-              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com"
-              - command: "ssh ${APP_USER}@prod-app-internal"
-
-  ecommerce:
-    description: "E-commerce platform project"
-    stages:
-      dev:
-        description: "Development environment"
-        services:
-          api:
-            description: "API server"
-            command:
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-          
-          mongodb:
-            description: "MongoDB database"
-            command:
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-          
-          elasticsearch:
-            description: "Elasticsearch cluster"
-            command:
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-      
-      prod:
-        description: "Production environment"
-        services:
-          api:
-            description: "Production API cluster"
-            steps:
-              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.ecommerce.com"
-              - command: "ssh ${API_USER}@prod-api-lb"
-
-# Global aliases for quick access
-aliases:
-  myapp-dev-db: "myapp.dev.db"
-  myapp-prod-db: "myapp.prod.db"
-  ecom-dev-api: "ecommerce.dev.api"
-  ecom-mongo: "ecommerce.dev.mongodb"
 
 # Global configuration settings
 global_settings:
