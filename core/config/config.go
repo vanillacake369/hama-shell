@@ -30,13 +30,9 @@ type Stage struct {
 
 // Service defines connection details for a specific service.
 type Service struct {
-	Description string `yaml:"description"`
-	Host        string `yaml:"host,omitempty"`
-	User        string `yaml:"user,omitempty"`
-	Key         string `yaml:"key,omitempty"`
-	Port        int    `yaml:"port,omitempty"`
-	Tunnel      string `yaml:"tunnel,omitempty"`
-	Steps       []Step `yaml:"steps,omitempty"`
+	Description string   `yaml:"description"`
+	Command     []string `yaml:"command,omitempty"`
+	Steps       []Step   `yaml:"steps,omitempty"`
 }
 
 // Step is a single shell or SSH command to execute within a session.

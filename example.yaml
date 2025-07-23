@@ -10,53 +10,35 @@ projects:
         services:
           db:
             description: "PostgreSQL database connection"
-            host: "dev-db.myapp.com"
-            user: "${DB_USER}"
-            key: "${SSH_KEY_PATH}"
-            port: 22
-            tunnel: "5432:localhost:5432"
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
           
           server:
             description: "Application server"
-            host: "dev-app.myapp.com"
-            user: "${APP_USER}"
-            key: "${SSH_KEY_PATH}"
-            port: 22
-          
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
           jenkins:
             description: "CI/CD Jenkins server"
-            host: "jenkins.myapp.com"
-            user: "jenkins"
-            key: "${JENKINS_KEY}"
-            port: 8080
-            tunnel: "8080:localhost:8080"
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
           
           redis:
             description: "Redis cache server"
-            host: "dev-redis.myapp.com"
-            user: "${REDIS_USER}"
-            key: "${SSH_KEY_PATH}"
-            port: 22
-            tunnel: "6379:localhost:6379"
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
             
       staging:
         description: "Staging environment"
         services:
           db:
             description: "Staging database"
-            host: "staging-db.myapp.com"
-            user: "${DB_USER}"
-            key: "${SSH_KEY_PATH}"
-            port: 22
-            tunnel: "5432:localhost:5432"
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
           
           server:
             description: "Staging application server"
-            host: "staging-app.myapp.com"
-            user: "${APP_USER}"
-            key: "${SSH_KEY_PATH}"
-            port: 22
-            
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
       prod:
         description: "Production environment"
         services:
@@ -80,27 +62,18 @@ projects:
         services:
           api:
             description: "API server"
-            host: "dev-api.ecommerce.com"
-            user: "${API_USER}"
-            key: "${SSH_KEY_PATH}"
-            port: 22
-            tunnel: "3000:localhost:3000"
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
           
           mongodb:
             description: "MongoDB database"
-            host: "dev-mongo.ecommerce.com"
-            user: "${MONGO_USER}"
-            key: "${SSH_KEY_PATH}"
-            port: 22
-            tunnel: "27017:localhost:27017"
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
           
           elasticsearch:
             description: "Elasticsearch cluster"
-            host: "dev-es.ecommerce.com"
-            user: "${ES_USER}"
-            key: "${SSH_KEY_PATH}"
-            port: 22
-            tunnel: "9200:localhost:9200"
+            command:
+              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
       
       prod:
         description: "Production environment"

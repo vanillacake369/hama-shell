@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// ToDo : 테스트케이스부터 다시 짜기
-// ToDo : Assertions 라이브러리 활용해서 THEN 절 개선하기
 func TestGetConfig(t *testing.T) {
 	// Create a temporary YAML file for testing
 	tempDir := t.TempDir()
@@ -24,17 +22,12 @@ projects:
         services:
           db:
             description: "PostgreSQL database connection"
-            host: "dev-db.myapp.com"
-            user: "dbuser"
-            key: "/path/to/ssh/key"
-            port: 22
-            tunnel: "5432:localhost:5432"
+            command:
+              - "ssh -L 5432:dev-db.myapp.com:5432 dbuser@dev-db.myapp.com -i /path/to/ssh/key"
           server:
             description: "Application server"
-            host: "dev-app.myapp.com"
-            user: "appuser"
-            key: "/path/to/ssh/key"
-            port: 22
+            command:
+              - "ssh appuser@dev-app.myapp.com -i /path/to/ssh/key"
       prod:
         description: "Production environment"
         services:
@@ -97,18 +90,13 @@ global_settings:
 
 	// Verify DB service details
 	assert.Equal(t, "PostgreSQL database connection", dbService.Description, "DB service description should match")
-	assert.Equal(t, "dev-db.myapp.com", dbService.Host, "DB host should match")
-	assert.Equal(t, "dbuser", dbService.User, "DB user should match")
-	assert.Equal(t, "/path/to/ssh/key", dbService.Key, "DB key should match")
-	assert.Equal(t, 22, dbService.Port, "DB port should be 22")
-	assert.Equal(t, "5432:localhost:5432", dbService.Tunnel, "DB tunnel should match")
+	assert.Len(t, dbService.Command, 1, "DB service should have 1 command")
+	assert.Equal(t, "ssh -L 5432:dev-db.myapp.com:5432 dbuser@dev-db.myapp.com -i /path/to/ssh/key", dbService.Command[0], "DB command should match")
 
 	// Verify server service details
 	assert.Equal(t, "Application server", serverService.Description, "Server service description should match")
-	assert.Equal(t, "dev-app.myapp.com", serverService.Host, "Server host should match")
-	assert.Equal(t, "appuser", serverService.User, "Server user should match")
-	assert.Equal(t, "/path/to/ssh/key", serverService.Key, "Server key should match")
-	assert.Equal(t, 22, serverService.Port, "Server port should be 22")
+	assert.Len(t, serverService.Command, 1, "Server service should have 1 command")
+	assert.Equal(t, "ssh appuser@dev-app.myapp.com -i /path/to/ssh/key", serverService.Command[0], "Server command should match")
 
 	// Verify prod stage with steps
 	prodDbService, prodDbExists := prodStage.Services["db"]
@@ -177,17 +165,14 @@ func TestExampleYAML(t *testing.T) {
 	dbService, dbExists := devStage.Services["db"]
 	assert.True(t, dbExists, "db service should exist")
 	assert.Equal(t, "PostgreSQL database connection", dbService.Description, "db service description should match")
-	assert.Equal(t, "dev-db.myapp.com", dbService.Host, "db host should match")
-	assert.Equal(t, "${DB_USER}", dbService.User, "db user should use env var")
-	assert.Equal(t, "${SSH_KEY_PATH}", dbService.Key, "db key should use env var")
-	assert.Equal(t, 22, dbService.Port, "db port should be 22")
-	assert.Equal(t, "5432:localhost:5432", dbService.Tunnel, "db tunnel should match")
+	assert.Len(t, dbService.Command, 1, "db service should have 1 command")
+	assert.Equal(t, "ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N", dbService.Command[0], "db command should match")
 
 	jenkinsService, jenkinsExists := devStage.Services["jenkins"]
 	assert.True(t, jenkinsExists, "jenkins service should exist")
 	assert.Equal(t, "CI/CD Jenkins server", jenkinsService.Description, "jenkins description should match")
-	assert.Equal(t, "jenkins.myapp.com", jenkinsService.Host, "jenkins host should match")
-	assert.Equal(t, 8080, jenkinsService.Port, "jenkins port should be 8080")
+	assert.Len(t, jenkinsService.Command, 1, "jenkins service should have 1 command")
+	assert.Equal(t, "ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N", jenkinsService.Command[0], "jenkins command should match")
 
 	// Verify ecommerce project
 	ecomProject, ecomExists := config.Projects["ecommerce"]
