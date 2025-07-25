@@ -117,113 +117,49 @@ Each service can have:
 
 ### ⌨ Commands
 
-**Using project.stage.service pattern:**
+**Configuration Management:**
 
 ```shell
-# Connect to services using the dot notation
-hama-shell myapp.dev.db          # Connect to development database
-hama-shell myapp.prod.server     # Connect to production server
-hama-shell ecommerce.dev.redis   # Connect to development Redis
+# Initialize new configuration
+hama-shell init                  # Create new config.yaml with interactive prompts
 ```
 
-**Core Session Management:**
+**Session Management:**
 
 ```shell
-# Start connections
-hama-shell start myapp.dev.db
+# Run shell sessions
+hama-shell run [session-name]    # Start/run a configured session
 
-# Start multiple connections
-hama-shell start myapp.dev.db myapp.dev.server
+# Kill active sessions
+hama-shell kill [session-name]   # Stop/kill running sessions
 
-# Check status
-hama-shell status myapp.dev.db
-hama-shell status --all
-
-# Stop connections
-hama-shell stop myapp.dev.db
-hama-shell stop --all
+# Explain session commands
+hama-shell explain [session-name] # Show what commands a session will execute
 ```
 
-**Service Discovery:**
+**Monitoring and Dashboard:**
 
 ```shell
-# List all available services
-hama-shell list
-hama-shell list myapp             # List services for specific project
-hama-shell list myapp.dev         # List services for specific stage
-
-# Show service details
-hama-shell show myapp.dev.db
-
-# Validate configuration
-hama-shell validate
-hama-shell validate myapp.dev.db
-```
-
-**Connection Testing:**
-
-```shell
-# Test connection without starting
-hama-shell test myapp.dev.db
-hama-shell test myapp.dev.db --dry-run
-
-# Health check
-hama-shell health myapp.dev.db
-hama-shell health --all
-```
-
-**Logs and Monitoring:**
-
-```shell
-# View connection logs
-hama-shell logs myapp.dev.db
-hama-shell logs myapp.dev.db --tail 50
-hama-shell logs myapp.dev.db --follow
-
-# Monitor connection status
-hama-shell monitor myapp.dev.db
-hama-shell monitor --all
-```
-
-**Interactive Mode:**
-
-```shell
-# Interactive service selection
-hama-shell interactive
-hama-shell i
-
-# Dashboard view
-hama-shell dashboard
-hama-shell dash
+# View dashboard
+hama-shell dashboard             # Show interactive dashboard of all sessions
 ```
 
 ### 🍀 Example Usage Scenarios
 
 ```shell
-# Quick development workflow
-hama-shell start myapp.dev.db
-hama-shell status myapp.dev.db
-hama-shell logs myapp.dev.db --follow
+# Initial setup
+hama-shell init                  # Interactive configuration setup
+
+# Basic session management
+hama-shell run myapp.dev.db      # Start database session
+hama-shell explain myapp.dev.db  # See what commands will be executed
+hama-shell dashboard             # Monitor all active sessions
+hama-shell kill myapp.dev.db     # Stop the session
 ```
 
 ```shell
-# Production database access
-hama-shell test myapp.prod.db --dry-run
-hama-shell start myapp.prod.db
-hama-shell monitor myapp.prod.db
-```
-
-```shell
-# Multi-service development setup
-hama-shell start myapp.dev.db myapp.dev.server myapp.dev.jenkins
-hama-shell status myapp.dev.db myapp.dev.server myapp.dev.jenkins
-hama-shell stop myapp.dev.db myapp.dev.server myapp.dev.jenkins
-```
-
-```shell
-# Cross-project workflow
-hama-shell start myapp.dev.db ecommerce.dev.redis
-hama-shell list myapp
-hama-shell list ecommerce
-hama-shell stop --all
+# Development workflow
+hama-shell run myapp.dev.server  # Start application server
+hama-shell run myapp.dev.db      # Start database connection
+hama-shell dashboard             # Monitor both sessions
 ```
