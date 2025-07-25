@@ -35,7 +35,7 @@ global_settings:
   auto_restart: true
 `
 
-func TestGetConfig(t *testing.T) {
+func TestLoad(t *testing.T) {
 	// Create temporary file
 	tmpFile, err := os.CreateTemp("", "config-*.yaml")
 	if err != nil {
@@ -50,7 +50,8 @@ func TestGetConfig(t *testing.T) {
 	tmpFile.Close()
 
 	// Test successful config loading
-	config, err := GetConfig(tmpFile.Name())
+	loader := NewLoader(tmpFile.Name())
+	config, err := loader.Load(tmpFile.Name())
 	if err != nil {
 		t.Fatalf("GetConfig failed: %v", err)
 	}
@@ -148,7 +149,9 @@ func TestGetConfig(t *testing.T) {
 }
 
 func TestGetConfig_FileNotFound(t *testing.T) {
-	_, err := GetConfig("nonexistent-file.yaml")
+	path := "nonexistent-file.yaml"
+	loader := NewLoader(path)
+	_, err := loader.Load(path)
 	if err == nil {
 		t.Error("Expected error for nonexistent file, got nil")
 	}
@@ -176,7 +179,8 @@ func TestGetConfig_InvalidYAML(t *testing.T) {
 	}
 	tmpFile.Close()
 
-	_, err = GetConfig(tmpFile.Name())
+	loader := NewLoader(tmpFile.Name())
+	_, err = loader.Load(tmpFile.Name())
 	if err == nil {
 		t.Error("Expected error for invalid YAML, got nil")
 	}
@@ -197,7 +201,8 @@ func TestGetConfig_RelativePath(t *testing.T) {
 
 	// Test with relative path
 	relativePath := filepath.Base(tmpFile.Name())
-	config, err := GetConfig(relativePath)
+	loader := NewLoader(relativePath)
+	config, err := loader.Load(relativePath)
 	if err != nil {
 		t.Fatalf("GetConfig with relative path failed: %v", err)
 	}
@@ -225,7 +230,8 @@ global_settings:
 	}
 	tmpFile.Close()
 
-	config, err := GetConfig(tmpFile.Name())
+	loader := NewLoader(tmpFile.Name())
+	config, err := loader.Load(tmpFile.Name())
 	if err != nil {
 		t.Fatalf("GetConfig failed: %v", err)
 	}

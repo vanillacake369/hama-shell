@@ -48,50 +48,10 @@ func (l *Loader) Load(path string) (*types.Config, error) {
 		return nil, fmt.Errorf("failed to read configuration file: %w", err)
 	}
 
-	// Parse configuration
-	config, err := l.LoadFromBytes(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse configuration from %s: %w", path, err)
-	}
-
-	// Store current config and path
-	l.currentConfig = config
-	l.configPath = path
-
-	return config, nil
-}
-
-// LoadFromBytes loads configuration from byte data
-func (l *Loader) LoadFromBytes(data []byte) (*types.Config, error) {
-	var config types.Config
-
 	// Parse YAML
+	var config types.Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-
-	// Set default version if not specified
-	if config.Version == "" {
-		config.Version = "1.0"
-	}
-
-	// Initialize maps if nil
-	if config.Projects == nil {
-		config.Projects = make(map[string]types.Project)
-	}
-	if config.GlobalAlias == nil {
-		config.GlobalAlias = make(map[string]string)
-	}
-	if config.Templates == nil {
-		config.Templates = make(map[string]types.SessionConfig)
-	}
-
-	// Process and validate each project
-	for projectName, project := range config.Projects {
-		if err := l.processProject(&project, projectName); err != nil {
-			return nil, fmt.Errorf("error processing project %s: %w", projectName, err)
-		}
-		config.Projects[projectName] = project
+		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 
 	return &config, nil
@@ -156,45 +116,10 @@ func (l *Loader) findConfigFile() string {
 
 // processProject processes and validates a project configuration
 func (l *Loader) processProject(project *types.Project, projectName string) error {
-	// Set project name if not set
-	if project.Name == "" {
-		project.Name = projectName
-	}
 
 	// Initialize stages if nil
 	if project.Stages == nil {
 		project.Stages = make(map[string]types.Stage)
-	}
-
-	// Process each stage
-	for stageName, stage := range project.Stages {
-		if err := l.processStage(&stage, stageName); err != nil {
-			return fmt.Errorf("error processing stage %s: %w", stageName, err)
-		}
-		project.Stages[stageName] = stage
-	}
-
-	return nil
-}
-
-// processStage processes and validates a stage configuration
-func (l *Loader) processStage(stage *types.Stage, stageName string) error {
-	// Set stage name if not set
-	if stage.Name == "" {
-		stage.Name = stageName
-	}
-
-	// Initialize developers if nil
-	if stage.Developers == nil {
-		stage.Developers = make(map[string]types.Developer)
-	}
-
-	// Process each developer
-	for developerName, developer := range stage.Developers {
-		if err := l.processDeveloper(&developer, developerName); err != nil {
-			return fmt.Errorf("error processing developer %s: %w", developerName, err)
-		}
-		stage.Developers[developerName] = developer
 	}
 
 	return nil

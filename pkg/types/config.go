@@ -1,28 +1,35 @@
 package types
 
-// Config represents the main configuration structure
+// Config represents the top-level YAML configuration
+// pulled from file into Go structs.
 type Config struct {
-	Version     string                   `json:"version" yaml:"version"`
-	Projects    map[string]Project       `json:"projects" yaml:"projects"`
-	GlobalAlias map[string]string        `json:"global_alias,omitempty" yaml:"global_alias,omitempty"`
-	Settings    ConfigSettings           `json:"settings,omitempty" yaml:"settings,omitempty"`
-	Templates   map[string]SessionConfig `json:"templates,omitempty" yaml:"templates,omitempty"`
+	Projects       map[string]Project `yaml:"projects"`
+	GlobalSettings GlobalSettings     `yaml:"global_settings"`
 }
 
-// Project represents a project with multiple stages
+// Project groups stages under a project name.
 type Project struct {
-	Name        string                 `json:"name" yaml:"name"`
-	Description string                 `json:"description,omitempty" yaml:"description,omitempty"`
-	Stages      map[string]Stage       `json:"stages" yaml:"stages"`
-	Settings    map[string]interface{} `json:"settings,omitempty" yaml:"settings,omitempty"`
+	Description string           `yaml:"description"`
+	Stages      map[string]Stage `yaml:"stages"`
 }
 
-// Stage represents a stage within a project
+// Stage represents a deployment or build stage within a project.
 type Stage struct {
-	Name        string                 `json:"name" yaml:"name"`
-	Description string                 `json:"description,omitempty" yaml:"description,omitempty"`
-	Developers  map[string]Developer   `json:"developers" yaml:"developers"`
-	Settings    map[string]interface{} `json:"settings,omitempty" yaml:"settings,omitempty"`
+	Description string             `yaml:"description,omitempty"`
+	Services    map[string]Service `yaml:"services"`
+}
+
+// Service defines connection details for a specific service.
+type Service struct {
+	Description string   `yaml:"description"`
+	Commands    []string `yaml:"commands"`
+}
+
+// GlobalSettings configures retry logic, timeouts, and auto-restart behavior.
+type GlobalSettings struct {
+	Retries     int  `yaml:"retries"`
+	Timeout     int  `yaml:"timeout"`
+	AutoRestart bool `yaml:"auto_restart"`
 }
 
 // Developer represents a developer's configuration
