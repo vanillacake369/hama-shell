@@ -12,7 +12,6 @@ import (
 // pulled from file into Go structs.
 type Config struct {
 	Projects       map[string]Project `yaml:"projects"`
-	Aliases        map[string]string  `yaml:"aliases,omitempty"`
 	GlobalSettings GlobalSettings     `yaml:"global_settings"`
 }
 
@@ -31,7 +30,7 @@ type Stage struct {
 // Service defines connection details for a specific service.
 type Service struct {
 	Description string   `yaml:"description"`
-	Command     []string `yaml:"command"`
+	Commands    []string `yaml:"commands"`
 }
 
 // GlobalSettings configures retry logic, timeouts, and auto-restart behavior.

@@ -65,36 +65,24 @@ projects:
     description: "Main application project"
     stages:
       dev:
-        description: "Development environment"
         services:
           db:
-            description: "PostgreSQL database connection"
-            host: "dev-db.myapp.com"
-            user: "${DB_USER}"
-            key: "${SSH_KEY_PATH}"
-            tunnel: "5432:localhost:5432"
-          
-          server:
-            description: "Application server"
-            host: "dev-app.myapp.com"
-            user: "${APP_USER}"
-            key: "${SSH_KEY_PATH}"
-          
-          jenkins:
-            description: "CI/CD Jenkins server"
-            host: "jenkins.myapp.com"
-            user: "jenkins"
-            key: "${JENKINS_KEY}"
-            tunnel: "8080:localhost:8080"
-            
+            description: "Develop database"
+            commands:
+              - "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.dev.com"
+              - "${DEV_DB_PW}"
+          api-server:
+            description: "Develop database"
+            commands:
+              - "aws configure ,,,"
+              - "aws ssm ,,,"
       prod:
         services:
           db:
             description: "Production database"
-            steps:
-              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com"
-              - command: "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy"
-
+            commands:
+              - "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com"
+              - "${PROD_DB_PW}"
 # Global settings
 global_settings:
   timeout: 30

@@ -24,10 +24,10 @@ var initCmd = &cobra.Command{
 		//		Step 4: Environment Stage
 		//      "Which environment stage is this for? (e.g., development, production, staging, etc.)"
 		//	 - 어떤 명령어? (한 줄 한 줄 입력받되, 빈 줄 입력 시 명령어 입력 단계 종료)
-		//		Step 5: Command Input
+		//		Step 5: Commands Input
 		//      "Now let's define the commands for this connection. Enter each command on a separate line. When you're finished, press Enter on an empty line to continue."
 		//   - 입력한 명령어 최종 확인 (y -> yes 로 입력받아 다음 단계로 넘어감, n -> no 로 입력받아 명령어 다시 입력받게끔 처리)
-		//		Step 6: Command Confirmation
+		//		Step 6: Commands Confirmation
 		//      "Please review your commands below. Type 'y' to confirm and proceed, or 'n' to edit them again."
 		// 	 - 글로벌 세팅 (재)설정
 		//		Step 7: Global Settings
