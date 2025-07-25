@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"hama-shell/pkg/types"
 	"path/filepath"
-	"strings"
 )
 
 // ConfigService provides configuration management operations
@@ -53,64 +52,6 @@ func (s *ConfigService) ResolveSessionPath(pathOrAlias string) (string, error) {
 
 	// If not an alias, return as-is (assume it's a path)
 	return pathOrAlias, nil
-}
-
-// GetSessionConfig retrieves a session configuration by path
-func (s *ConfigService) GetSessionConfig(sessionPath string) (*types.SessionConfig, error) {
-	if s.config == nil {
-		return nil, fmt.Errorf("configuration not loaded")
-	}
-
-	// Parse session path: project.stage.developer.session
-	parts := strings.Split(sessionPath, ".")
-	if len(parts) != 4 {
-		return nil, fmt.Errorf("invalid session path format: %s (expected: project.stage.developer.session)", sessionPath)
-	}
-
-	projectName, stageName, developerName, sessionName := parts[0], parts[1], parts[2], parts[3]
-
-	project, exists := s.config.Projects[projectName]
-	if !exists {
-		return nil, fmt.Errorf("project not found: %s", projectName)
-	}
-
-	stage, exists := project.Stages[stageName]
-	if !exists {
-		return nil, fmt.Errorf("stage not found: %s in project %s", stageName, projectName)
-	}
-
-	developer, exists := stage.Developers[developerName]
-	if !exists {
-		return nil, fmt.Errorf("developer not found: %s in stage %s", developerName, stageName)
-	}
-
-	sessionConfig, exists := developer.Sessions[sessionName]
-	if !exists {
-		return nil, fmt.Errorf("session not found: %s for developer %s", sessionName, developerName)
-	}
-
-	return &sessionConfig, nil
-}
-
-// GetAllSessionPaths returns all available session paths
-func (s *ConfigService) GetAllSessionPaths() ([]string, error) {
-	if s.config == nil {
-		return nil, fmt.Errorf("configuration not loaded")
-	}
-
-	var paths []string
-	for projectName, project := range s.config.Projects {
-		for stageName, stage := range project.Stages {
-			for developerName, developer := range stage.Developers {
-				for sessionName := range developer.Sessions {
-					path := fmt.Sprintf("%s.%s.%s.%s", projectName, stageName, developerName, sessionName)
-					paths = append(paths, path)
-				}
-			}
-		}
-	}
-
-	return paths, nil
 }
 
 // ValidateConfig validates the current configuration

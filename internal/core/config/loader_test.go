@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,6 +56,31 @@ func TestLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetConfig failed: %v", err)
 	}
+
+	// Print parsed YAML result for debugging
+	fmt.Printf("=== PARSED CONFIG DEBUG OUTPUT ===\n")
+	fmt.Printf("Global Settings: Timeout=%d, Retries=%d, AutoRestart=%t\n",
+		config.GlobalSettings.Timeout, config.GlobalSettings.Retries, config.GlobalSettings.AutoRestart)
+	fmt.Printf("Number of Projects: %d\n", len(config.Projects))
+
+	for projectName, project := range config.Projects {
+		fmt.Printf("Project '%s': Description='%s', Stages=%d\n",
+			projectName, project.Description, len(project.Stages))
+
+		for stageName, stage := range project.Stages {
+			fmt.Printf("  Stage '%s': Description='%s', Services=%d\n",
+				stageName, stage.Description, len(stage.Services))
+
+			for serviceName, service := range stage.Services {
+				fmt.Printf("    Service '%s': Description='%s', Commands=%d\n",
+					serviceName, service.Description, len(service.Commands))
+				for i, cmd := range service.Commands {
+					fmt.Printf("      Command[%d]: %s\n", i, cmd)
+				}
+			}
+		}
+	}
+	fmt.Printf("=== END DEBUG OUTPUT ===\n")
 
 	// Verify global settings
 	if config.GlobalSettings.Timeout != 30 {
