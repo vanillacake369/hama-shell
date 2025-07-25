@@ -185,71 +185,114 @@ Before considering a feature complete:
 - `go mod download` - Download module dependencies
 - `go get <package>` - Add new dependencies
 
-## Module Architecture
+## Component-Based Architecture
 
-### Core Modules
+HamaShell is designed with a clean, component-based architecture that promotes flexibility, maintainability, and cross-platform compatibility. The architecture centers around four core component groups with clear interfaces and responsibilities.
 
-#### 1. Configuration Module (`pkg/config/`)
-```go
-// config.go - YAML parsing and validation
-// alias.go - Global alias registry and resolution
-// validation.go - Configuration validation
-```
+### Core Component Groups
 
-#### 2. Session Module (`pkg/session/`)
-```go
-// session.go - Session data structures and lifecycle
-// manager.go - Session management and orchestration
-// process.go - SSH process management
-// state.go - Session state persistence
-```
+#### 1. Session Management (`internal/core/session/`)
+- **Session Manager** (`manager.go`) - Session lifecycle management and orchestration
+- **Session State** (`state.go`) - In-memory session state management
+- **Session Persistence** (`persistence.go`) - File-based session persistence and recovery
 
-#### 3. CLI Module (`pkg/cli/`)
-```go
-// commands.go - CLI command definitions
-// start.go - Start command implementation
-// status.go - Status command implementation
-// alias.go - Alias management commands
-// interactive.go - Interactive mode
-```
+#### 2. Connection Management (`internal/core/connection/`)
+- **Connection Manager** (`manager.go`) - Connection lifecycle and management
+- **SSH Client** (`ssh.go`) - SSH connection handling and authentication
+- **Tunnel Manager** (`tunnel.go`) - Port forwarding and tunnel management
+- **Health Monitor** (`monitor.go`) - Connection health monitoring and auto-recovery
 
-#### 4. Network Module (`pkg/network/`)
-```go
-// ssh.go - SSH connection handling
-// tunnel.go - Tunneling and port forwarding
-// monitor.go - Connection health monitoring
-```
+#### 3. Configuration (`internal/core/config/`)
+- **Config Loader** (`loader.go`) - YAML configuration loading and parsing
+- **Config Validator** (`validator.go`) - Configuration validation and schema checking
+- **Alias Manager** (`alias.go`) - Global alias registry and resolution
 
-#### 5. Utils Module (`pkg/utils/`)
-```go
-// env.go - Environment variable handling
-// log.go - Logging utilities
-// path.go - Path resolution utilities
-```
+#### 4. Terminal Integration (`internal/core/terminal/`)
+- **Terminal Interface** (`interface.go`) - Terminal session management
+- **Multiplexer Integration** (`multiplexer.go`) - Tmux/Zellij/Screen integration
+- **Shell Integration** (`shell.go`) - Shell command execution and completion
+
+### Service Layer (`internal/service/`)
+- **Session Service** (`session_service.go`) - Session management business logic
+- **Config Service** (`config_service.go`) - Configuration management operations
+- **Connection Service** (`connection_service.go`) - Connection management business logic
+- **Terminal Service** (`terminal_service.go`) - Terminal integration operations
+
+### CLI Layer (`cmd/`)
+- **Root Command** (`root.go`) - Main CLI entry point with configuration
+- **Start Command** (`start.go`) - Session start operations
+- **Stop Command** (`stop.go`) - Session stop operations
+- **Status Command** (`status.go`) - Session status monitoring
+- **Config Command** (`config.go`) - Configuration management
+- **Alias Command** (`alias.go`) - Alias management
+- **Interactive Command** (`interactive.go`) - TUI mode
+
+### Type Definitions (`pkg/types/`)
+- **Session Types** (`session.go`) - Session interfaces and data structures
+- **Config Types** (`config.go`) - Configuration interfaces and data structures
+- **Connection Types** (`connection.go`) - Connection interfaces and data structures
+- **Terminal Types** (`terminal.go`) - Terminal integration interfaces
+
+### Infrastructure Layer (`internal/infrastructure/`)
+- **Storage** (`storage/`) - File system and state storage abstractions
+- **Network** (`network/`) - Network client and port forwarding implementations
+- **Process** (`process/`) - Process control and execution management
+- **Platform** (`platform/`) - OS-specific abstractions and implementations
+
+### Integration Layer (`pkg/integration/`)
+- **Tmux Integration** (`tmux.go`) - Tmux-specific multiplexer implementation
+- **Zellij Integration** (`zellij.go`) - Zellij-specific multiplexer implementation
+- **Shell Integration** (`shell.go`) - Shell-specific integrations
 
 ### Project Structure
 ```
 hama-shell/
 ├── main.go                 # Entry point
 ├── go.mod                  # Module definition
-├── pkg/
-│   ├── config/            # Configuration management
-│   ├── session/           # Session management
-│   ├── cli/               # CLI commands
-│   ├── network/           # Network operations
-│   └── utils/             # Utilities
-├── cmd/                   # Command implementations
-├── internal/              # Internal packages
-├── examples/              # Example configurations
-├── docs/                  # Documentation
-├── tests/                 # Test files
-├── .github/
-│   └── workflows/         # CI/CD workflows
-├── scripts/               # Build and installation scripts
-└── .goreleaser.yml        # Release configuration
+├── cmd/                    # CLI command implementations
+│   ├── root.go
+│   ├── start.go
+│   ├── stop.go
+│   ├── status.go
+│   ├── config.go
+│   ├── alias.go
+│   └── interactive.go
+├── internal/               # Internal packages
+│   ├── service/           # Service layer business logic
+│   ├── core/              # Core component implementations
+│   │   ├── session/       # Session management
+│   │   ├── connection/    # Connection management
+│   │   ├── config/        # Configuration management
+│   │   └── terminal/      # Terminal integration
+│   └── infrastructure/    # Infrastructure layer
+│       ├── storage/       # File system abstractions
+│       ├── network/       # Network implementations
+│       ├── process/       # Process management
+│       └── platform/      # OS abstractions
+├── pkg/                   # Public packages
+│   ├── types/            # Type definitions and interfaces
+│   └── integration/      # External integrations
+├── scripts/              # Build and deployment scripts
+│   ├── completion/       # Shell completion scripts
+│   └── multiplexer/      # Multiplexer integration scripts
+├── examples/             # Example configurations
+├── docs/                 # Documentation
+└── .github/
+    └── workflows/        # CI/CD workflows
 ```
 
-### Current State
-- Basic Go module initialized with Go 1.24
-- Single `main.go` file with placeholder code
-- Ready for modular architecture implementation
+### Current Implementation State
+- ✅ **Directory Structure**: Complete component-based structure created
+- ✅ **Type Definitions**: All core interfaces and types implemented
+- ✅ **CLI Layer**: All command structures with Cobra integration
+- ✅ **Service Layer**: Business logic services implemented
+- ✅ **Core Components**: Session management and config loader implemented
+- 🚧 **Infrastructure Layer**: Ready for platform-specific implementations
+- 🚧 **Integration Layer**: Ready for multiplexer and shell integrations
+
+### Architecture Benefits Achieved
+- **Component-Based Design**: Clear separation of concerns with focused responsibilities
+- **Interface-Driven**: All components use well-defined interfaces for testability
+- **Layered Architecture**: Clean dependency flow from CLI → Service → Core → Infrastructure
+- **Cross-Platform Ready**: Infrastructure layer prepared for platform-specific implementations
+- **Testable**: Interface-driven design enables comprehensive unit and integration testing

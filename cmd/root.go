@@ -2,23 +2,67 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
+var (
+	cfgFile string
+	verbose bool
+)
+
+// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "hama-shell",
-	Short: "hama-shell is a session and connection manager for developers",
-	Long:  "HamaShell is a session and connection manager designed for developers who need reliable, secure access to various hosts in single CLI command.",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("HamaShell - Session Manager for Developers")
-		fmt.Println("Use 'hama-shell --help' for available commands")
-	},
+	Short: "A session and connection manager for developers",
+	Long: `HamaShell is a session and connection manager designed for developers who need reliable, secure access to various hosts in single CLI command.
+
+It simplifies complex multi-step SSH tunneling and session setup by letting developers define their connections declaratively in a YAML file.
+
+Key Features:
+- Declarative YAML-based configuration
+- Multi-step SSH tunneling and port forwarding
+- Terminal multiplexer integration (tmux, zellij, screen)
+- Session state management and persistence
+- Cross-platform support`,
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error executing HamaShell: %s\n", err)
+	err := rootCmd.Execute()
+	if err != nil {
 		os.Exit(1)
+	}
+}
+
+func init() {
+	cobra.OnInitialize(initConfig)
+
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.hama-shell.yaml)")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
+}
+
+// initConfig reads in config file and ENV variables if set.
+func initConfig() {
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+	} else {
+		home, err := os.UserHomeDir()
+		cobra.CheckErr(err)
+
+		viper.AddConfigPath(home)
+		viper.AddConfigPath(".")
+		viper.SetConfigType("yaml")
+		viper.SetConfigName(".hama-shell")
+	}
+
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err == nil {
+		if verbose {
+			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		}
 	}
 }

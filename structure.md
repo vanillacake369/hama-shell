@@ -1,174 +1,9 @@
-# 🦛 HamaShell
+# HamaShell Component Architecture
 
-## 🚀 Project Overview
-
-This project is a **session and connection manager** designed for developers who need reliable, secure access to various hosts in single cli command.
-
-It simplifies complex multi-step SSH tunneling and session setup by letting developers define their connections declaratively in a YAML file.
-
-Unlike ad-hoc scripts, it offers **structured, secure, and controllable workflows**, making it easier to manage connections across projects and environments.
-
-## ✨ Why use this tool?
-
-✅ **Declarative & reproducible** — Define connections once in YAML and reuse them easily.
-
-✅ **Secure by design** — Uses system environment variables to keep secrets hidden and safe.
-
-✅ **Full process control** — Start, stop, check status, and manage connections interactively.
-
-✅ **Hierarchical organization** — Organize connections by project and stage.
-
-✅ **Parallel execution** — Run multiple sessions simultaneously without manual orchestration.
-
-✅ **Multi-cloud ready** — Works seamlessly with AWS, Oracle Cloud, Naver Cloud, and on-premise.
-
-✅ **Portable** — Runs on any Linux distro, integrates into CI/CD pipelines, and supports local dashboards for visibility.
-
-## 💡 Core Features
-
-### ✅ YAML-based configuration
-
-* Define complex multi-step tunneling and SSH workflows declaratively.
-* Supports dynamic command steps and environment variable substitution.
-
-### ✅ Secure & flexible connections
-
-* SSH with key-based authentication and multi-hop tunneling.
-* Leverages environment variables to avoid hardcoding secrets.
-
-### ✅ Powerful connection management
-
-* Persistent and recoverable sessions.
-* Process control: start, stop, view status, and monitor connections.
-* Port forwarding and connection health checks with automatic retry.
-
-### ✅ Developer-friendly CLI
-
-* Interactive commands for managing sessions.
-* Clear status reporting and logs for troubleshooting.
-
-### ✅ Extensible and cloud-ready
-
-* Integrates easily with major cloud providers and on-premises setups.
-* Flexible enough to be used in local development, on-premise, or CI/CD pipelines.
-
-## ⬇️ Installation
-## 📙 How to use
-
-### ⚙️ Configure
-
-Configure your connections using the simple **project.stage.service** pattern:
-
-```yaml
-projects:
-  myapp:
-    description: "Main application project"
-    stages:
-      dev:
-        description: "Development environment"
-        services:
-          db:
-            description: "PostgreSQL database connection"
-            host: "dev-db.myapp.com"
-            user: "${DB_USER}"
-            key: "${SSH_KEY_PATH}"
-            tunnel: "5432:localhost:5432"
-          
-          server:
-            description: "Application server"
-            host: "dev-app.myapp.com"
-            user: "${APP_USER}"
-            key: "${SSH_KEY_PATH}"
-          
-          jenkins:
-            description: "CI/CD Jenkins server"
-            host: "jenkins.myapp.com"
-            user: "jenkins"
-            key: "${JENKINS_KEY}"
-            tunnel: "8080:localhost:8080"
-            
-      prod:
-        services:
-          db:
-            description: "Production database"
-            steps:
-              - command: "ssh -i ${SSH_KEY_PATH} ${BASTION_USER}@bastion.prod.com"
-              - command: "ssh -L 5432:prod-db:5432 db-reader@prod-db-proxy"
-
-# Global settings
-global_settings:
-  timeout: 30
-  retries: 3
-  auto_restart: true
-```
-
-**Configuration Structure:**
-
-* **`projects`** - Your project name (e.g., `myapp`, `ecommerce`)
-* **`stages`** - Environment stage (e.g., `dev`, `staging`, `prod`)
-* **`services`** - Service type (e.g., `db`, `server`, `jenkins`, `redis`, `api`)
-
-Each service can have:
-- **`host`** - Target hostname
-- **`user`** - SSH username (supports env vars like `${USER}`)
-- **`key`** - SSH key path (supports env vars like `${SSH_KEY_PATH}`)
-- **`tunnel`** - Port forwarding (format: `local_port:remote_host:remote_port`)
-- **`steps`** - Multi-step commands for complex connections
-
-### ⌨ Commands
-
-**Configuration Management:**
-
-```shell
-# Initialize new configuration
-hama-shell init                  # Create new config.yaml with interactive prompts
-```
-
-**Session Management:**
-
-```shell
-# Run shell sessions
-hama-shell run [session-name]    # Start/run a configured session
-
-# Kill active sessions
-hama-shell kill [session-name]   # Stop/kill running sessions
-
-# Explain session commands
-hama-shell explain [session-name] # Show what commands a session will execute
-```
-
-**Monitoring and Dashboard:**
-
-```shell
-# View dashboard
-hama-shell dashboard             # Show interactive dashboard of all sessions
-```
-
-### 🍀 Example Usage Scenarios
-
-```shell
-# Initial setup
-hama-shell init                  # Interactive configuration setup
-
-# Basic session management
-hama-shell run myapp.dev.db      # Start database session
-hama-shell explain myapp.dev.db  # See what commands will be executed
-hama-shell dashboard             # Monitor all active sessions
-hama-shell kill myapp.dev.db     # Stop the session
-```
-
-```shell
-# Development workflow
-hama-shell run myapp.dev.server  # Start application server
-hama-shell run myapp.dev.db      # Start database connection
-hama-shell dashboard             # Monitor both sessions
-```
-
-## 🏗️ Architecture
-
+## Overview
 HamaShell is designed with a clean, component-based architecture that promotes flexibility, maintainability, and cross-platform compatibility. The architecture centers around four core component groups with clear interfaces and responsibilities.
 
-### Core Component Architecture
+## Core Component Architecture
 
 ```mermaid
 graph LR
@@ -210,7 +45,7 @@ graph LR
     TI --> SI
 ```
 
-### Layered Architecture
+## Layered Architecture
 
 ```mermaid
 graph TB
@@ -255,7 +90,7 @@ graph TB
     TI --> Platform
 ```
 
-### Package Structure
+## Package Structure
 
 ```mermaid
 graph TD
@@ -351,7 +186,7 @@ graph TD
     end
 ```
 
-### Component Flow Architecture
+## Component Flow Architecture
 
 ```mermaid
 sequenceDiagram
@@ -374,7 +209,104 @@ sequenceDiagram
     CLI-->>User: Terminal Output
 ```
 
-### Cross-Platform Integration Points
+## Core Component Interfaces
+
+### Session Management
+```go
+type SessionManager interface {
+    Create(config SessionConfig) (*Session, error)
+    Start(sessionID string) error
+    Stop(sessionID string) error
+    GetStatus(sessionID string) (SessionStatus, error)
+    List() ([]*Session, error)
+}
+
+type SessionState interface {
+    Save(session *Session) error
+    Load(sessionID string) (*Session, error)
+    Delete(sessionID string) error
+}
+
+type SessionPersistence interface {
+    Store(session *Session) error
+    Retrieve(sessionID string) (*Session, error)
+    Remove(sessionID string) error
+}
+```
+
+### Connection Management
+```go
+type ConnectionManager interface {
+    Connect(config ConnectionConfig) (Connection, error)
+    Disconnect(connectionID string) error
+    GetStatus(connectionID string) (ConnectionStatus, error)
+    List() ([]Connection, error)
+}
+
+type SSHClient interface {
+    Connect(host string, config SSHConfig) error
+    Execute(command string) ([]byte, error)
+    Disconnect() error
+}
+
+type TunnelManager interface {
+    CreateTunnel(config TunnelConfig) (Tunnel, error)
+    CloseTunnel(tunnelID string) error
+    ListTunnels() ([]Tunnel, error)
+}
+
+type HealthMonitor interface {
+    Monitor(connectionID string) (<-chan HealthStatus, error)
+    CheckHealth(connectionID string) (HealthStatus, error)
+    StopMonitoring(connectionID string) error
+}
+```
+
+### Configuration
+```go
+type ConfigLoader interface {
+    Load(path string) (*Config, error)
+    LoadFromBytes(data []byte) (*Config, error)
+    Reload() (*Config, error)
+}
+
+type ConfigValidator interface {
+    Validate(config *Config) error
+    ValidateSession(session SessionConfig) error
+}
+
+type AliasManager interface {
+    Resolve(alias string) (string, error)
+    List() (map[string]string, error)
+    Add(alias, path string) error
+    Remove(alias string) error
+}
+```
+
+### Terminal Integration
+```go
+type TerminalInterface interface {
+    Attach(sessionID string) error
+    Detach(sessionID string) error
+    SendInput(sessionID string, input []byte) error
+    GetOutput(sessionID string) (<-chan []byte, error)
+}
+
+type MultiplexerIntegration interface {
+    CreateSession(name string, config MultiplexerConfig) error
+    AttachToSession(sessionID string) error
+    DetachFromSession(sessionID string) error
+    ListSessions() ([]MultiplexerSession, error)
+}
+
+type ShellIntegration interface {
+    ExecuteCommand(command string) ([]byte, error)
+    SetEnvironment(env map[string]string) error
+    GetCompletion(input string) ([]string, error)
+}
+```
+
+## Cross-Platform Integration Points
 
 ```mermaid
 graph TB
@@ -413,45 +345,45 @@ graph TB
     Core --> Windows
 ```
 
-### Integration Features
+## Integration Features
 
-#### Terminal Multiplexer Support
+### Terminal Multiplexer Support
 - **Tmux**: Session creation, window management, pane splitting, layout management
 - **Zellij**: Layout configuration, plugin integration, session persistence
 - **Screen**: Basic session support and window management
 
-#### Shell Integration
+### Shell Integration
 - **Completion Scripts**: Auto-completion for all commands and aliases
 - **Environment Variables**: Seamless integration with shell environments
 - **Path Resolution**: Smart path handling across different shells
 
-#### Cross-Platform Features
+### Cross-Platform Features
 - **Process Management**: Unified process handling across OS platforms
 - **File System**: Cross-platform file operations and path handling
 - **Network Stack**: Platform-specific network optimizations
 - **Terminal Handling**: Native terminal integration per platform
 
-### Architecture Benefits
+## Architecture Benefits
 
-#### Component-Based Design
+### Component-Based Design
 - **Clear Responsibilities**: Each component has a focused, well-defined purpose
 - **Loose Coupling**: Components interact through well-defined interfaces
 - **High Cohesion**: Related functionality grouped within components
 - **Easy Testing**: Interface-driven design enables comprehensive unit testing
 
-#### Scalability & Extensibility
+### Scalability & Extensibility
 - **Service Layer**: Clean abstraction between CLI and core components
 - **Interface-Driven**: Easy to add new implementations and protocols
 - **Modular Structure**: Components can be developed and tested independently
 - **Plugin Architecture**: Clean interfaces enable easy plugin development
 
-#### Cross-Platform Compatibility
+### Cross-Platform Compatibility
 - **OS Abstraction**: Platform-specific code isolated in infrastructure layer
 - **Terminal Agnostic**: Works with tmux, zellij, screen, and native terminals
 - **Shell Universal**: Supports bash, zsh, fish with auto-completion
 - **Multiplexer Integration**: Seamless integration with popular multiplexers
 
-#### Maintainability & Reliability
+### Maintainability & Reliability
 - **Separation of Concerns**: Core logic separated from infrastructure details
 - **Dependency Injection**: Enables mocking and comprehensive testing
 - **Error Handling**: Consistent error propagation across components
