@@ -92,11 +92,3 @@ type ConfigValidator interface {
 	Validate(config *Config) error
 	ValidateSession(session SessionConfig) error
 }
-
-// AliasManager interface defines alias management operations
-type AliasManager interface {
-	Resolve(alias string) (string, error)
-	List() (map[string]string, error)
-	Add(alias, path string) error
-	Remove(alias string) error
-}

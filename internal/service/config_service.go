@@ -10,16 +10,14 @@ import (
 type ConfigService struct {
 	configLoader    types.ConfigLoader
 	configValidator types.ConfigValidator
-	aliasManager    types.AliasManager
 	config          *types.Config
 }
 
 // NewConfigService creates a new configuration service
-func NewConfigService(loader types.ConfigLoader, validator types.ConfigValidator, aliasManager types.AliasManager) *ConfigService {
+func NewConfigService(loader types.ConfigLoader, validator types.ConfigValidator) *ConfigService {
 	return &ConfigService{
 		configLoader:    loader,
 		configValidator: validator,
-		aliasManager:    aliasManager,
 	}
 }
 
@@ -41,17 +39,6 @@ func (s *ConfigService) LoadConfig(path string) error {
 // GetConfig returns the current configuration
 func (s *ConfigService) GetConfig() *types.Config {
 	return s.config
-}
-
-// ResolveSessionPath resolves a session path or alias to a full session path
-func (s *ConfigService) ResolveSessionPath(pathOrAlias string) (string, error) {
-	// Try to resolve as alias first
-	if resolved, err := s.aliasManager.Resolve(pathOrAlias); err == nil {
-		return resolved, nil
-	}
-
-	// If not an alias, return as-is (assume it's a path)
-	return pathOrAlias, nil
 }
 
 // ValidateConfig validates the current configuration
@@ -99,19 +86,4 @@ func (s *ConfigService) GetConfigPaths() map[string]string {
 	paths["system"] = "/etc/hama-shell/config.yaml"
 
 	return paths
-}
-
-// AddAlias adds a new alias
-func (s *ConfigService) AddAlias(alias, sessionPath string) error {
-	return s.aliasManager.Add(alias, sessionPath)
-}
-
-// RemoveAlias removes an alias
-func (s *ConfigService) RemoveAlias(alias string) error {
-	return s.aliasManager.Remove(alias)
-}
-
-// ListAliases returns all configured aliases
-func (s *ConfigService) ListAliases() (map[string]string, error) {
-	return s.aliasManager.List()
 }
