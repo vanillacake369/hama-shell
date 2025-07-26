@@ -13,7 +13,7 @@ import (
 type Loader struct {
 	configPath    string
 	searchPaths   []string
-	currentConfig *types.Config
+	currentConfig *Config
 }
 
 // NewLoader creates a new configuration loader
@@ -29,7 +29,7 @@ func NewLoader(configPath string) *Loader {
 }
 
 // Load loads configuration from the specified path
-func (l *Loader) Load(path string) (*types.Config, error) {
+func (l *Loader) Load(path string) (*Config, error) {
 	if path == "" {
 		path = l.findConfigFile()
 		if path == "" {
@@ -49,7 +49,7 @@ func (l *Loader) Load(path string) (*types.Config, error) {
 	}
 
 	// Parse YAML
-	var config types.Config
+	var config Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
@@ -58,7 +58,7 @@ func (l *Loader) Load(path string) (*types.Config, error) {
 }
 
 // Reload reloads the configuration from the current path
-func (l *Loader) Reload() (*types.Config, error) {
+func (l *Loader) Reload() (*Config, error) {
 	if l.configPath == "" {
 		return nil, fmt.Errorf("no configuration path set")
 	}
@@ -67,7 +67,7 @@ func (l *Loader) Reload() (*types.Config, error) {
 }
 
 // GetCurrentConfig returns the currently loaded configuration
-func (l *Loader) GetCurrentConfig() *types.Config {
+func (l *Loader) GetCurrentConfig() *Config {
 	return l.currentConfig
 }
 
@@ -115,18 +115,18 @@ func (l *Loader) findConfigFile() string {
 }
 
 // processProject processes and validates a project configuration
-func (l *Loader) processProject(project *types.Project, projectName string) error {
+func (l *Loader) processProject(project *Project, projectName string) error {
 
 	// Initialize stages if nil
 	if project.Stages == nil {
-		project.Stages = make(map[string]types.Stage)
+		project.Stages = make(map[string]Stage)
 	}
 
 	return nil
 }
 
 // processDeveloper processes and validates a developer configuration
-func (l *Loader) processDeveloper(developer *types.Developer, developerName string) error {
+func (l *Loader) processDeveloper(developer *Developer, developerName string) error {
 	// Set developer name if not set
 	if developer.Name == "" {
 		developer.Name = developerName

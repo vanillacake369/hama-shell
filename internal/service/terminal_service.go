@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"hama-shell/internal/core/config"
 	"hama-shell/pkg/types"
 )
 
@@ -59,7 +60,7 @@ func (s *TerminalService) GetOutput(sessionID string) (<-chan []byte, error) {
 }
 
 // CreateMultiplexerSession creates a new multiplexer session
-func (s *TerminalService) CreateMultiplexerSession(name string, config types.MultiplexerConfig) error {
+func (s *TerminalService) CreateMultiplexerSession(name string, config config.MultiplexerConfig) error {
 	if err := s.multiplexerIntegration.CreateSession(name, config); err != nil {
 		return fmt.Errorf("failed to create multiplexer session: %w", err)
 	}
@@ -83,7 +84,7 @@ func (s *TerminalService) DetachFromMultiplexerSession(sessionID string) error {
 }
 
 // ListMultiplexerSessions lists all multiplexer sessions
-func (s *TerminalService) ListMultiplexerSessions() ([]types.MultiplexerSession, error) {
+func (s *TerminalService) ListMultiplexerSessions() ([]config.MultiplexerSession, error) {
 	sessions, err := s.multiplexerIntegration.ListSessions()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list multiplexer sessions: %w", err)
@@ -118,10 +119,10 @@ func (s *TerminalService) GetShellCompletion(input string) ([]string, error) {
 }
 
 // SetupSessionTerminal sets up terminal integration for a session
-func (s *TerminalService) SetupSessionTerminal(sessionID string, config types.TerminalConfig) error {
+func (s *TerminalService) SetupSessionTerminal(sessionID string, config config.TerminalConfig) error {
 	// Create multiplexer session if configured
 	if config.Multiplexer != "" {
-		multiplexerConfig := types.MultiplexerConfig{
+		multiplexerConfig := config.MultiplexerConfig{
 			Type:        config.Multiplexer,
 			SessionName: config.SessionName,
 			WindowName:  config.WindowName,
@@ -145,7 +146,7 @@ func (s *TerminalService) SetupSessionTerminal(sessionID string, config types.Te
 }
 
 // TeardownSessionTerminal cleans up terminal integration for a session
-func (s *TerminalService) TeardownSessionTerminal(sessionID string, config types.TerminalConfig) error {
+func (s *TerminalService) TeardownSessionTerminal(sessionID string, config config.TerminalConfig) error {
 	// Detach from multiplexer if needed
 	if config.Multiplexer != "" && !config.DetachOnExit {
 		if err := s.DetachFromMultiplexerSession(sessionID); err != nil {

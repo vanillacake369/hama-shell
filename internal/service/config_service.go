@@ -2,19 +2,19 @@ package service
 
 import (
 	"fmt"
-	"hama-shell/pkg/types"
+	"hama-shell/internal/core/config"
 	"path/filepath"
 )
 
 // ConfigService provides configuration management operations
 type ConfigService struct {
-	configLoader    types.ConfigLoader
-	configValidator types.ConfigValidator
-	config          *types.Config
+	configLoader    config.ConfigLoader
+	configValidator config.ConfigValidator
+	config          *config.Config
 }
 
 // NewConfigService creates a new configuration service
-func NewConfigService(loader types.ConfigLoader, validator types.ConfigValidator) *ConfigService {
+func NewConfigService(loader config.ConfigLoader, validator config.ConfigValidator) *ConfigService {
 	return &ConfigService{
 		configLoader:    loader,
 		configValidator: validator,
@@ -37,7 +37,7 @@ func (s *ConfigService) LoadConfig(path string) error {
 }
 
 // GetConfig returns the current configuration
-func (s *ConfigService) GetConfig() *types.Config {
+func (s *ConfigService) GetConfig() *config.Config {
 	return s.config
 }
 
