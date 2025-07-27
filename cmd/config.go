@@ -4,6 +4,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	"hama-shell/internal/core/config"
 )
 
 // configCmd represents the config command
@@ -18,6 +21,7 @@ Examples:
   hama-shell config generate`,
 }
 
+// configValidateCmd validates .yaml holding config
 var configValidateCmd = &cobra.Command{
 	Use:   "validate [config-file]",
 	Short: "Validate configuration file",
@@ -39,10 +43,46 @@ Examples:
 			fmt.Printf("Validating configuration file: %s\n", configFile)
 		}
 
-		// TODO: Implement config validation logic
+		// Create validator
+		validator := config.NewValidator()
+
+		// If specific config file provided, load it temporarily
+		if configFile != "" {
+			// Save current viper config
+			currentConfig := viper.AllSettings()
+
+			// Load specific file into viper temporarily
+			viper.Reset()
+			viper.SetConfigFile(configFile)
+			if err := viper.ReadInConfig(); err != nil {
+				fmt.Printf("Error reading config file: %s\n", err)
+				return
+			}
+
+			// Validate the temporary config
+			if err := validator.ValidateViper(); err != nil {
+				fmt.Printf("Validation failed: %s\n", err)
+				return
+			}
+
+			// Restore original viper config
+			viper.Reset()
+			for key, value := range currentConfig {
+				viper.Set(key, value)
+			}
+		} else {
+			// Validate current viper config
+			if err := validator.ValidateViper(); err != nil {
+				fmt.Printf("Validation failed: %s\n", err)
+				return
+			}
+		}
+
+		fmt.Println("✓ Configuration is valid")
 	},
 }
 
+// configShowCmd shows .yaml holding config
 var configShowCmd = &cobra.Command{
 	Use:   "show [config-file]",
 	Short: "Show configuration file",
@@ -64,10 +104,84 @@ Examples:
 			fmt.Printf("Showing configuration file: %s\n", configFile)
 		}
 
-		// TODO: Implement config show logic
+		// Create validator
+		validator := config.NewValidator()
+
+		// If specific config file provided, show that file
+		if configFile != "" {
+			// Save current viper config
+			currentConfig := viper.AllSettings()
+
+			// Load specific file into viper temporarily
+			viper.Reset()
+			viper.SetConfigFile(configFile)
+			if err := viper.ReadInConfig(); err != nil {
+				fmt.Printf("Error reading config file: %s\n", err)
+				return
+			}
+
+			// Show the config structure
+			showConfigStructure(validator)
+
+			// Restore original viper config
+			viper.Reset()
+			for key, value := range currentConfig {
+				viper.Set(key, value)
+			}
+		} else {
+			// Show current viper config
+			showConfigStructure(validator)
+		}
 	},
 }
 
+// showConfigStructure displays the config structure in a readable format
+func showConfigStructure(validator *config.Validator) {
+	fmt.Println("Configuration Structure:")
+	fmt.Println("========================")
+
+	projects := validator.GetProjects()
+	if len(projects) == 0 {
+		fmt.Println("No projects found")
+		return
+	}
+
+	for _, projectName := range projects {
+		fmt.Printf("Project: %s\n", projectName)
+
+		stages := validator.GetStages(projectName)
+		for _, stageName := range stages {
+			fmt.Printf("  Stage: %s\n", stageName)
+
+			services := validator.GetServices(projectName, stageName)
+			for _, serviceName := range services {
+				fmt.Printf("    Service: %s\n", serviceName)
+
+				// Show commands for this service
+				commands := viper.GetStringSlice(fmt.Sprintf("projects.%s.stages.%s.services.%s.commands", projectName, stageName, serviceName))
+				for i, command := range commands {
+					fmt.Printf("      Command[%d]: %s\n", i+1, command)
+				}
+			}
+		}
+		fmt.Println()
+	}
+
+	// Show global settings
+	fmt.Println("Global Settings:")
+	fmt.Println("================")
+	if viper.IsSet("global_settings.timeout") {
+		fmt.Printf("Timeout: %d\n", viper.GetInt("global_settings.timeout"))
+	}
+	if viper.IsSet("global_settings.retries") {
+		fmt.Printf("Retries: %d\n", viper.GetInt("global_settings.retries"))
+	}
+	if viper.IsSet("global_settings.auto_restart") {
+		fmt.Printf("Auto Restart: %t\n", viper.GetBool("global_settings.auto_restart"))
+	}
+}
+
+// configGenerateCmd generates .yaml holding config
 var configGenerateCmd = &cobra.Command{
 	Use:   "generate [config-file]",
 	Short: "Generate configuration file",

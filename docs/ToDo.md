@@ -5,7 +5,9 @@
 ## 🎯 1단계: 소규모 목표 - 기본 CLI 구조
 **우선순위: 높음** - 기반 설정
 - [x] viper 설정 로딩 수정 및 example.yaml로 테스트
-- [ ] 기본 start 명령어 골격 구현
+- [x] 기본 start 명령어 골격 구현
+- [ ] start 명령어에 대한 테스트 
+- [ ] start 명령어에 대한 리팩토링 
 - [ ] 기본 stop 명령어 골격 구현  
 - [ ] 기본 status 명령어 골격 구현
 - [ ] `pkg/types/config.go`에 설정 타입 생성

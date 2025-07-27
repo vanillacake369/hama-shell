@@ -10,18 +10,18 @@ projects:
         services:
           db:
             description: "PostgreSQL database connection"
-            command:
+            commands:
               - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
               - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
               - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
 
           server:
             description: "Application server"
-            command:
+            commands:
               - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
           jenkins:
             description: "CI/CD Jenkins server"
-            command:
+            commands:
               - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
 
 # Global configuration settings
