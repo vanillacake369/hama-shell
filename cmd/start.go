@@ -10,7 +10,7 @@ import (
 var startCmd = &cobra.Command{
 	Use:   "start [session-path]",
 	Short: "Start a session",
-	Long: `Start a session based on the configuration path or alias.
+	Long: `Start a session based on the configuration path.
 
 Examples:
   hama-shell start project.stage.developer.session
@@ -18,7 +18,6 @@ Examples:
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		all, _ := cmd.Flags().GetBool("all")
-		background, _ := cmd.Flags().GetBool("background")
 
 		if all {
 			fmt.Println("Starting all sessions...")
@@ -27,18 +26,13 @@ Examples:
 		}
 
 		if len(args) == 0 {
-			fmt.Println("Error: session path or alias required")
+			fmt.Println("Error: session path required")
 			cmd.Help()
 			return
 		}
 
 		sessionPath := args[0]
-		if background {
-			fmt.Printf("Starting session '%s' in background...\n", sessionPath)
-		} else {
-			fmt.Printf("Starting session '%s'...\n", sessionPath)
-		}
-
+		fmt.Printf("Starting session '%s' in background...\n", sessionPath)
 		// TODO: Implement start session logic
 	},
 }
@@ -47,6 +41,4 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 
 	startCmd.Flags().BoolP("all", "a", false, "Start all configured sessions")
-	startCmd.Flags().BoolP("background", "b", false, "Start session in background")
-	startCmd.Flags().StringP("config", "c", "", "Config file path")
 }

@@ -10,7 +10,7 @@
 - [ ] 기본 status 명령어 골격 구현
 - [ ] `pkg/types/config.go`에 설정 타입 생성
 
-## 🔧 2단계: 개선 - 핵심 컴포넌트
+## 🔧 2단계: 개선 - 핵심 컴포넌트 
 **우선순위: 중간** - 핵심 기능
 - [ ] `internal/core/config/loader.go`에 설정 로더 구현
 - [ ] `internal/core/config/validator.go`에 설정 검증기 구현

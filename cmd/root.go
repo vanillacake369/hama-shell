@@ -55,5 +55,6 @@ func initConfig() {
 		_, _ = fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	} else {
 		_, _ = fmt.Fprintf(os.Stderr, "No config file found: %v\n", err)
+		// ToDo : make a config file ${home}/hama-shell.yaml
 	}
 }
