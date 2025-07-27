@@ -14,7 +14,6 @@ var startCmd = &cobra.Command{
 
 Examples:
   hama-shell start project.stage.developer.session
-  hama-shell start my-alias
   hama-shell start --all`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

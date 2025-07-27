@@ -2,10 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -22,6 +21,10 @@ Key Features:
 - Terminal multiplexer integration (tmux, zellij, screen)
 - Session state management and persistence
 - Cross-platform support`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// This forces initConfig to run
+		fmt.Println("Root command executed - config should be loaded")
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -44,11 +47,13 @@ func initConfig() {
 	viper.AddConfigPath(home)
 	viper.AddConfigPath(".")
 	viper.SetConfigType("yaml")
-	viper.SetConfigName(".hama-shell")
+	viper.SetConfigName("hama-shell")
 
 	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	err = viper.ReadInConfig()
+	if err == nil {
+		_, _ = fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	} else {
+		_, _ = fmt.Fprintf(os.Stderr, "No config file found: %v\n", err)
 	}
 }
