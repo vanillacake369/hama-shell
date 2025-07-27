@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
+	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	"hama-shell/internal/core/executor"
 )
 
 // startCmd represents the start command
@@ -33,7 +36,7 @@ Examples:
 		}
 
 		sessionPath := args[0]
-		commands := viper.GetStringSlice(sessionPath + ".command")
+		commands := viper.GetStringSlice(sessionPath + ".commands")
 
 		if len(commands) == 0 {
 			fmt.Printf("No commands found for session: %s\n", sessionPath)
@@ -41,7 +44,26 @@ Examples:
 		}
 
 		fmt.Printf("Starting session '%s' with %d commands...\n", sessionPath, len(commands))
-		// TODO: Execute commands
+
+		// Create command executor with 30 second timeout
+		executor := executor.NewCommandExecutor(30 * time.Second)
+
+		// Execute commands sequentially
+		results, err := executor.ExecuteCommands(commands)
+		if err != nil {
+			fmt.Printf("Error executing commands: %s\n", err)
+			return
+		}
+
+		// Check if any command failed
+		for _, result := range results {
+			if result.Error != nil {
+				fmt.Printf("Command failed: %s - %s\n", result.Command, result.Error)
+				return
+			}
+		}
+
+		fmt.Printf("Session '%s' completed successfully\n", sessionPath)
 	},
 }
 
