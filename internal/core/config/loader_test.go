@@ -7,7 +7,8 @@ import (
 	"testing"
 )
 
-const testYAMLConfig = `projects:
+const testYAMLConfig = `
+projects:
   myapp:
     description: "Main application project"
     stages:

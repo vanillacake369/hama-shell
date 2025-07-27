@@ -15,7 +15,7 @@ var configCmd = &cobra.Command{
 Examples:
   hama-shell config validate
   hama-shell config show
-  hama-shell config template list`,
+  hama-shell config generate`,
 }
 
 var configValidateCmd = &cobra.Command{
@@ -44,54 +44,73 @@ Examples:
 }
 
 var configShowCmd = &cobra.Command{
-	Use:   "show",
-	Short: "Show current configuration",
-	Long:  `Show the current configuration with resolved values.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		json, _ := cmd.Flags().GetBool("json")
-		paths, _ := cmd.Flags().GetBool("paths")
+	Use:   "show [config-file]",
+	Short: "Show configuration file",
+	Long: `Show the configuration file syntax and structure.
 
-		if json {
-			fmt.Println("Showing configuration in JSON format...")
-		} else if paths {
-			fmt.Println("Showing configuration paths...")
+Examples:
+  hama-shell config show
+  hama-shell config show /path/to/config.yaml`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		var configFile string
+		if len(args) > 0 {
+			configFile = args[0]
+		}
+
+		if configFile == "" {
+			fmt.Println("Showing default configuration...")
 		} else {
-			fmt.Println("Showing current configuration...")
+			fmt.Printf("Showing configuration file: %s\n", configFile)
 		}
 
 		// TODO: Implement config show logic
 	},
 }
 
-var configTemplateCmd = &cobra.Command{
-	Use:   "template",
-	Short: "Manage configuration templates",
-	Long:  `Manage configuration templates for sessions and projects.`,
-}
+var configGenerateCmd = &cobra.Command{
+	Use:   "generate [config-file]",
+	Short: "Generate configuration file",
+	Long: `Generate the configuration file syntax and structure.
 
-var configTemplateListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List available templates",
+Examples:
+  hama-shell config generate
+  hama-shell config generate /path/to/config.yaml`,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Available configuration templates:")
-		// TODO: Implement template list logic
-	},
-}
-
-var configTemplateGenerateCmd = &cobra.Command{
-	Use:   "generate [template-name]",
-	Short: "Generate configuration from template",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		templateName := args[0]
-		output, _ := cmd.Flags().GetString("output")
-
-		fmt.Printf("Generating configuration from template: %s\n", templateName)
-		if output != "" {
-			fmt.Printf("Output file: %s\n", output)
+		var configFile string
+		if len(args) > 0 {
+			configFile = args[0]
 		}
 
-		// TODO: Implement template generation logic
+		if configFile == "" {
+			fmt.Println("Generating default configuration...")
+		} else {
+			fmt.Printf("Generating configuration file: %s\n", configFile)
+		}
+
+		// ToDo : Config 선언
+		//	 - 어떤 파일명으로 config.yaml 선언할 것인지?
+		//		Step 1: Configuration File Setup
+		//      "Let's start by setting up your configuration. What would you like to name your config.yaml file?"
+		//	 - 어떤 프로젝트?
+		//		Step 2: Project Selection
+		//      "Which project are you configuring? This helps organize your connections by project scope."
+		//	 - 어떤 서비스? (db, api-server, gitlab runner ,,,)
+		//		Step 3: Service Definition
+		//      "What type of service are you connecting to? (e.g., database, API server, GitLab runner, etc.)"
+		//	 - 어떤 스테이지? (dev, prod ,,)
+		//		Step 4: Environment Stage
+		//      "Which environment stage is this for? (e.g., development, production, staging, etc.)"
+		//	 - 어떤 명령어? (한 줄 한 줄 입력받되, 빈 줄 입력 시 명령어 입력 단계 종료)
+		//		Step 5: Commands Input
+		//      "Now let's define the commands for this connection. Enter each command on a separate line. When you're finished, press Enter on an empty line to continue."
+		//   - 입력한 명령어 최종 확인 (y -> yes 로 입력받아 다음 단계로 넘어감, n -> no 로 입력받아 명령어 다시 입력받게끔 처리)
+		//		Step 6: Commands Confirmation
+		//      "Please review your commands below. Type 'y' to confirm and proceed, or 'n' to edit them again."
+		// 	 - 글로벌 세팅 (재)설정
+		//		Step 7: Global Settings
+		//      "Finally, let's configure your global settings. These will apply across all your connections."
 	},
 }
 
@@ -99,16 +118,10 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 
 	// Add subcommands
-	configCmd.AddCommand(configValidateCmd)
 	configCmd.AddCommand(configShowCmd)
-	configCmd.AddCommand(configTemplateCmd)
-
-	configTemplateCmd.AddCommand(configTemplateListCmd)
-	configTemplateCmd.AddCommand(configTemplateGenerateCmd)
+	configCmd.AddCommand(configValidateCmd)
+	configCmd.AddCommand(configGenerateCmd)
 
 	// Flags
-	configShowCmd.Flags().BoolP("json", "j", false, "Output in JSON format")
 	configShowCmd.Flags().BoolP("paths", "p", false, "Show configuration file paths")
-
-	configTemplateGenerateCmd.Flags().StringP("output", "o", "", "Output file path")
 }

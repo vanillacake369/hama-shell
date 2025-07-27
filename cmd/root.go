@@ -8,11 +8,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	cfgFile string
-	verbose bool
-)
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "hama-shell",
@@ -39,30 +34,21 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.hama-shell.yaml)")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
+	home, err := os.UserHomeDir()
+	cobra.CheckErr(err)
 
-		viper.AddConfigPath(home)
-		viper.AddConfigPath(".")
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".hama-shell")
-	}
+	viper.AddConfigPath(home)
+	viper.AddConfigPath(".")
+	viper.SetConfigType("yaml")
+	viper.SetConfigName(".hama-shell")
 
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
-		if verbose {
-			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
-		}
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 }
