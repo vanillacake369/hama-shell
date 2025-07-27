@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
 )
@@ -32,8 +33,15 @@ Examples:
 		}
 
 		sessionPath := args[0]
-		fmt.Printf("Starting session '%s' in background...\n", sessionPath)
-		// TODO: Implement start session logic
+		commands := viper.GetStringSlice(sessionPath + ".command")
+
+		if len(commands) == 0 {
+			fmt.Printf("No commands found for session: %s\n", sessionPath)
+			return
+		}
+
+		fmt.Printf("Starting session '%s' with %d commands...\n", sessionPath, len(commands))
+		// TODO: Execute commands
 	},
 }
 
