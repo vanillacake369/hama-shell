@@ -5,7 +5,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"os"
+
+	"hama-shell/internal/core/config"
 )
+
+// AppConfig holds the parsed and validated configuration
+var AppConfig *config.Config
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -41,8 +46,24 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	// Create validator and parse config
+	validator := config.NewValidator()
+
+	// Try to parse and validate config
+	var err error
+	AppConfig, err = validator.ParseAndValidate("")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Please check your configuration file or run 'hama-shell config generate' to create one.\n")
+		os.Exit(1)
+	}
+
+	// Also keep viper config for backward compatibility during transition
 	home, err := os.UserHomeDir()
-	cobra.CheckErr(err)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to get user home directory: %v\n", err)
+		os.Exit(1)
+	}
 
 	viper.AddConfigPath(home)
 	viper.AddConfigPath(".")
@@ -50,9 +71,5 @@ func initConfig() {
 	viper.SetConfigName("hama-shell")
 
 	viper.AutomaticEnv()
-	err = viper.ReadInConfig()
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "No config file found: %v\n", err)
-		// ToDo : make a config file ${home}/hama-shell.yaml
-	}
+	_ = viper.ReadInConfig() // Ignore errors for now as we have static config
 }

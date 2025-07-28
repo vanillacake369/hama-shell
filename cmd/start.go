@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
+	"hama-shell/internal/core/config"
 	"hama-shell/internal/core/executor"
 )
 
@@ -36,7 +36,19 @@ Examples:
 		}
 
 		sessionPath := args[0]
-		commands := viper.GetStringSlice(sessionPath + ".commands")
+
+		// Check if AppConfig is available
+		if AppConfig == nil {
+			fmt.Println("Error: Configuration not loaded")
+			return
+		}
+
+		// Get commands from static config
+		commands, err := config.GetCommands(AppConfig, sessionPath)
+		if err != nil {
+			fmt.Printf("Error getting commands for session '%s': %s\n", sessionPath, err)
+			return
+		}
 
 		if len(commands) == 0 {
 			fmt.Printf("No commands found for session: %s\n", sessionPath)
@@ -45,11 +57,14 @@ Examples:
 
 		fmt.Printf("Starting session '%s' with %d commands...\n", sessionPath, len(commands))
 
-		// ToDo : Fix it to apply the option in 'config.yaml'
-		// Create command executor with 30 second timeout
-		executor := executor.NewCommandExecutor(30 * time.Second)
+		// Create command executor with configured timeout
+		timeout := AppConfig.GlobalSettings.Timeout
+		executor := executor.NewCommandExecutor(time.Duration(timeout) * time.Second)
 
 		// Execute commands sequentially
+		// ToDo : How can I process keepAlive on executor ?
+		// ToDo : How can I process keepAlive on executor ?
+		// ToDo : How can I process keepAlive on executor ?
 		results, err := executor.ExecuteCommands(commands)
 		if err != nil {
 			fmt.Printf("Error executing commands: %s\n", err)

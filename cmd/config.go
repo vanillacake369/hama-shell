@@ -140,26 +140,39 @@ func showConfigStructure(validator *config.Validator) {
 	fmt.Println("Configuration Structure:")
 	fmt.Println("========================")
 
-	projects := validator.GetProjects()
-	if len(projects) == 0 {
+	// Static config load fail
+	if AppConfig == nil {
+		fmt.Println("Configuration Load failed")
+	}
+	showStaticConfigStructure(AppConfig)
+}
+
+// showStaticConfigStructure shows config from parsed static config
+func showStaticConfigStructure(cfg *config.Config) {
+	if len(cfg.Projects) == 0 {
 		fmt.Println("No projects found")
 		return
 	}
 
-	for _, projectName := range projects {
+	for projectName, project := range cfg.Projects {
 		fmt.Printf("Project: %s\n", projectName)
+		if project.Description != "" {
+			fmt.Printf("  Description: %s\n", project.Description)
+		}
 
-		stages := validator.GetStages(projectName)
-		for _, stageName := range stages {
+		for stageName, stage := range project.Stages {
 			fmt.Printf("  Stage: %s\n", stageName)
+			if stage.Description != "" {
+				fmt.Printf("    Description: %s\n", stage.Description)
+			}
 
-			services := validator.GetServices(projectName, stageName)
-			for _, serviceName := range services {
+			for serviceName, service := range stage.Services {
 				fmt.Printf("    Service: %s\n", serviceName)
+				if service.Description != "" {
+					fmt.Printf("      Description: %s\n", service.Description)
+				}
 
-				// Show commands for this service
-				commands := viper.GetStringSlice(fmt.Sprintf("projects.%s.stages.%s.services.%s.commands", projectName, stageName, serviceName))
-				for i, command := range commands {
+				for i, command := range service.Commands {
 					fmt.Printf("      Command[%d]: %s\n", i+1, command)
 				}
 			}
@@ -170,15 +183,9 @@ func showConfigStructure(validator *config.Validator) {
 	// Show global settings
 	fmt.Println("Global Settings:")
 	fmt.Println("================")
-	if viper.IsSet("global_settings.timeout") {
-		fmt.Printf("Timeout: %d\n", viper.GetInt("global_settings.timeout"))
-	}
-	if viper.IsSet("global_settings.retries") {
-		fmt.Printf("Retries: %d\n", viper.GetInt("global_settings.retries"))
-	}
-	if viper.IsSet("global_settings.auto_restart") {
-		fmt.Printf("Auto Restart: %t\n", viper.GetBool("global_settings.auto_restart"))
-	}
+	fmt.Printf("Timeout: %d seconds\n", cfg.GlobalSettings.Timeout)
+	fmt.Printf("Retries: %d\n", cfg.GlobalSettings.Retries)
+	fmt.Printf("Auto Restart: %t\n", cfg.GlobalSettings.AutoRestart)
 }
 
 // configGenerateCmd generates .yaml holding config

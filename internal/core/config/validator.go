@@ -2,8 +2,12 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Config represents the expected YAML structure (schema definition only)
@@ -243,4 +247,181 @@ func (v *Validator) GetServices(projectName, stageName string) []string {
 		serviceNames = append(serviceNames, name)
 	}
 	return serviceNames
+}
+
+// ParseAndValidate parses a config file and returns a validated Config struct
+func (v *Validator) ParseAndValidate(configPath string) (*Config, error) {
+	// If no config path provided, try to find default locations
+	if configPath == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user home directory: %w", err)
+		}
+
+		// Try common locations
+		possiblePaths := []string{
+			filepath.Join(home, "hama-shell.yaml"),
+			filepath.Join(home, "hama-shell.yml"),
+			"hama-shell.yaml",
+			"hama-shell.yml",
+		}
+
+		for _, path := range possiblePaths {
+			if _, err := os.Stat(path); err == nil {
+				configPath = path
+				break
+			}
+		}
+
+		if configPath == "" {
+			return nil, fmt.Errorf("no config file found in default locations")
+		}
+	}
+
+	// Read the config file
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file %s: %w", configPath, err)
+	}
+
+	// Parse YAML
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
+	}
+
+	// Apply default values
+	if config.GlobalSettings.Timeout == 0 {
+		config.GlobalSettings.Timeout = 30 // default 30 seconds
+	}
+	if config.GlobalSettings.Retries == 0 {
+		config.GlobalSettings.Retries = 3 // default 3 retries
+	}
+	// AutoRestart defaults to false, which is zero value
+
+	// Validate the parsed config
+	if err := v.ValidateConfig(&config); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
+	}
+
+	return &config, nil
+}
+
+// ValidateConfig validates a Config struct directly
+func (v *Validator) ValidateConfig(config *Config) error {
+	if config == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+
+	// Check if projects section exists
+	if len(config.Projects) == 0 {
+		return fmt.Errorf("missing required 'projects' section")
+	}
+
+	// Validate each project
+	for projectName, project := range config.Projects {
+		if err := v.validateProjectStruct(projectName, project); err != nil {
+			return err
+		}
+	}
+
+	// Validate global settings
+	if err := v.validateGlobalSettingsStruct(config.GlobalSettings); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateProjectStruct validates a Project struct
+func (v *Validator) validateProjectStruct(projectName string, project Project) error {
+	if len(project.Stages) == 0 {
+		return fmt.Errorf("project '%s' must have at least one stage", projectName)
+	}
+
+	// Validate each stage
+	for stageName, stage := range project.Stages {
+		if err := v.validateStageStruct(projectName, stageName, stage); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateStageStruct validates a Stage struct
+func (v *Validator) validateStageStruct(projectName, stageName string, stage Stage) error {
+	if len(stage.Services) == 0 {
+		return fmt.Errorf("stage '%s.%s' must have at least one service", projectName, stageName)
+	}
+
+	// Validate each service
+	for serviceName, service := range stage.Services {
+		if err := v.validateServiceStruct(projectName, stageName, serviceName, service); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateServiceStruct validates a Service struct
+func (v *Validator) validateServiceStruct(projectName, stageName, serviceName string, service Service) error {
+	if len(service.Commands) == 0 {
+		return fmt.Errorf("service '%s.%s.%s' must have at least one command", projectName, stageName, serviceName)
+	}
+
+	// Validate each command is not empty
+	for i, cmd := range service.Commands {
+		if cmd == "" {
+			return fmt.Errorf("service '%s.%s.%s' command[%d] cannot be empty", projectName, stageName, serviceName, i)
+		}
+	}
+
+	return nil
+}
+
+// validateGlobalSettingsStruct validates GlobalSettings struct
+func (v *Validator) validateGlobalSettingsStruct(settings GlobalSettings) error {
+	if settings.Timeout < 0 {
+		return fmt.Errorf("global_settings.timeout must be non-negative")
+	}
+	if settings.Retries < 0 {
+		return fmt.Errorf("global_settings.retries must be non-negative")
+	}
+
+	return nil
+}
+
+// GetCommands returns commands for a specific session path from parsed config
+func GetCommands(config *Config, sessionPath string) ([]string, error) {
+	if config == nil {
+		return nil, fmt.Errorf("config is nil")
+	}
+
+	// Parse session path: project.stage.service
+	parts := strings.Split(sessionPath, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid session path format, expected 'project.stage.service', got '%s'", sessionPath)
+	}
+
+	projectName, stageName, serviceName := parts[0], parts[1], parts[2]
+
+	// Navigate config structure
+	project, exists := config.Projects[projectName]
+	if !exists {
+		return nil, fmt.Errorf("project '%s' not found", projectName)
+	}
+
+	stage, exists := project.Stages[stageName]
+	if !exists {
+		return nil, fmt.Errorf("stage '%s' not found in project '%s'", stageName, projectName)
+	}
+
+	service, exists := stage.Services[serviceName]
+	if !exists {
+		return nil, fmt.Errorf("service '%s' not found in stage '%s.%s'", serviceName, projectName, stageName)
+	}
+
+	return service.Commands, nil
 }
