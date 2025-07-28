@@ -18,9 +18,21 @@ type CommandExecutor interface {
 	ExecuteCommandInteractive(command string) ExecutionResult
 	ExecuteCommandsParallel(commands []string, maxConcurrent int) ([]ExecutionResult, error)
 	ExecuteWithRealtimeOutput(command string) ExecutionResult
+	ExecuteCommandsKeepAlive(commands []string) error
 	StopAll() error
 	IsRunning() bool
 	GetRunningCommands() []string
+	GetProcessStatus() map[string]ProcessStatus
+}
+
+// ProcessStatus represents the status of a keep-alive process
+type ProcessStatus struct {
+	Command      string
+	Status       string // "running", "failed", "restarting"
+	RestartCount int
+	LastRestart  time.Time
+	StartTime    time.Time
+	PID          int
 }
 
 // ExecutionResult contains the result of command execution
@@ -35,21 +47,25 @@ type ExecutionResult struct {
 
 // commandExecutor is the base implementation
 type commandExecutor struct {
-	timeout time.Duration
-	ctx     context.Context
-	cancel  context.CancelFunc
-	mu      sync.RWMutex
-	running map[string]*exec.Cmd
+	timeout    time.Duration
+	ctx        context.Context
+	cancel     context.CancelFunc
+	mu         sync.RWMutex
+	running    map[string]*exec.Cmd
+	processes  map[string]*ProcessStatus
+	stopSignal chan struct{}
 }
 
 // NewCommandExecutor creates a new command executor with default timeout
 func NewCommandExecutor(timeout time.Duration) CommandExecutor {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &commandExecutor{
-		timeout: timeout,
-		ctx:     ctx,
-		cancel:  cancel,
-		running: make(map[string]*exec.Cmd),
+		timeout:    timeout,
+		ctx:        ctx,
+		cancel:     cancel,
+		running:    make(map[string]*exec.Cmd),
+		processes:  make(map[string]*ProcessStatus),
+		stopSignal: make(chan struct{}),
 	}
 }
 
@@ -227,6 +243,9 @@ func (ce *commandExecutor) ExecuteCommandsParallel(commands []string, maxConcurr
 
 // StopAll cancels all running commands
 func (ce *commandExecutor) StopAll() error {
+	// Signal all keep-alive processes to stop
+	close(ce.stopSignal)
+
 	ce.mu.RLock()
 	commands := make([]*exec.Cmd, 0, len(ce.running))
 	for _, cmd := range ce.running {
@@ -391,6 +410,176 @@ func (ce *commandExecutor) ExecuteWithRealtimeOutput(command string) ExecutionRe
 		Duration:  duration,
 		StartTime: startTime,
 	}
+}
+
+// ExecuteCommandsKeepAlive runs commands in background with auto-restart
+func (ce *commandExecutor) ExecuteCommandsKeepAlive(commands []string) error {
+	fmt.Printf("Starting %d commands in keep-alive mode...\n", len(commands))
+
+	// Start all commands in background
+	for i, command := range commands {
+		fmt.Printf("[%d/%d] Starting background process: %s\n", i+1, len(commands), command)
+		go ce.runKeepAliveProcess(command)
+	}
+
+	// Monitor processes and handle stop signal
+	go ce.monitorProcesses()
+
+	return nil
+}
+
+// runKeepAliveProcess runs a single command with auto-restart
+func (ce *commandExecutor) runKeepAliveProcess(command string) {
+	restartCount := 0
+	maxRestarts := 10 // Prevent infinite restart loops
+
+	// Initialize process status
+	ce.mu.Lock()
+	ce.processes[command] = &ProcessStatus{
+		Command:      command,
+		Status:       "starting",
+		StartTime:    time.Now(),
+		RestartCount: 0,
+	}
+	ce.mu.Unlock()
+
+	for restartCount <= maxRestarts {
+		// Check if we should stop
+		select {
+		case <-ce.stopSignal:
+			ce.updateProcessStatus(command, "stopped", restartCount)
+			return
+		default:
+		}
+
+		// Parse command and arguments
+		parts := strings.Fields(command)
+		if len(parts) == 0 {
+			ce.updateProcessStatus(command, "failed", restartCount)
+			return
+		}
+
+		// Create command without timeout for keep-alive
+		cmd := exec.Command(parts[0], parts[1:]...)
+		ce.setupCommand(cmd)
+
+		// Store running command
+		ce.mu.Lock()
+		ce.running[command] = cmd
+		ce.mu.Unlock()
+
+		// Update process status
+		if cmd.Process != nil {
+			ce.updateProcessStatusWithPID(command, "running", restartCount, cmd.Process.Pid)
+		} else {
+			ce.updateProcessStatus(command, "running", restartCount)
+		}
+
+		fmt.Printf("Process started: %s (attempt %d)\n", command, restartCount+1)
+
+		// Run command and wait for completion
+		err := cmd.Run()
+
+		// Clean up from running map
+		ce.mu.Lock()
+		delete(ce.running, command)
+		ce.mu.Unlock()
+
+		if err != nil {
+			restartCount++
+			fmt.Printf("Process died: %s (error: %v), restart count: %d\n", command, err, restartCount)
+
+			if restartCount <= maxRestarts {
+				ce.updateProcessStatus(command, "restarting", restartCount)
+
+				// Exponential backoff: 5s, 10s, 20s, 40s, max 60s
+				delay := time.Duration(5*(1<<uint(restartCount-1))) * time.Second
+				if delay > 60*time.Second {
+					delay = 60 * time.Second
+				}
+
+				fmt.Printf("Restarting in %v...\n", delay)
+				time.Sleep(delay)
+			} else {
+				ce.updateProcessStatus(command, "failed", restartCount)
+				fmt.Printf("Process %s failed permanently after %d restarts\n", command, maxRestarts)
+				return
+			}
+		} else {
+			// Process completed normally
+			ce.updateProcessStatus(command, "completed", restartCount)
+			fmt.Printf("Process completed normally: %s\n", command)
+			return
+		}
+	}
+}
+
+// updateProcessStatus updates the status of a process
+func (ce *commandExecutor) updateProcessStatus(command, status string, restartCount int) {
+	ce.mu.Lock()
+	defer ce.mu.Unlock()
+
+	if process, exists := ce.processes[command]; exists {
+		process.Status = status
+		process.RestartCount = restartCount
+		process.LastRestart = time.Now()
+	}
+}
+
+// updateProcessStatusWithPID updates the status of a process with PID
+func (ce *commandExecutor) updateProcessStatusWithPID(command, status string, restartCount, pid int) {
+	ce.mu.Lock()
+	defer ce.mu.Unlock()
+
+	if process, exists := ce.processes[command]; exists {
+		process.Status = status
+		process.RestartCount = restartCount
+		process.LastRestart = time.Now()
+		process.PID = pid
+	}
+}
+
+// monitorProcesses monitors the health of keep-alive processes
+func (ce *commandExecutor) monitorProcesses() {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ce.stopSignal:
+			return
+		case <-ticker.C:
+			ce.checkProcessHealth()
+		}
+	}
+}
+
+// checkProcessHealth checks if processes are still healthy
+func (ce *commandExecutor) checkProcessHealth() {
+	ce.mu.RLock()
+	defer ce.mu.RUnlock()
+
+	for command, process := range ce.processes {
+		if process.Status == "running" {
+			// Check if process is still in running map
+			if _, exists := ce.running[command]; !exists {
+				fmt.Printf("Process %s appears to have died unexpectedly\n", command)
+			}
+		}
+	}
+}
+
+// GetProcessStatus returns the status of all keep-alive processes
+func (ce *commandExecutor) GetProcessStatus() map[string]ProcessStatus {
+	ce.mu.RLock()
+	defer ce.mu.RUnlock()
+
+	status := make(map[string]ProcessStatus)
+	for command, process := range ce.processes {
+		status[command] = *process
+	}
+
+	return status
 }
 
 // Platform-specific methods to be implemented in platform files
