@@ -45,6 +45,7 @@ Examples:
 
 		fmt.Printf("Starting session '%s' with %d commands...\n", sessionPath, len(commands))
 
+		// ToDo : Fix it to apply the option in 'config.yaml'
 		// Create command executor with 30 second timeout
 		executor := executor.NewCommandExecutor(30 * time.Second)
 
