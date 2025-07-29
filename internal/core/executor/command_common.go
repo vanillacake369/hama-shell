@@ -11,6 +11,38 @@ import (
 	"time"
 )
 
+// ProcessStatusType represents the status of a keep-alive process
+type ProcessStatusType int
+
+const (
+	ProcessStatusStarting ProcessStatusType = iota
+	ProcessStatusRunning
+	ProcessStatusFailed
+	ProcessStatusRestarting
+	ProcessStatusStopped
+	ProcessStatusCompleted
+)
+
+// String returns the string representation of ProcessStatusType
+func (pst ProcessStatusType) String() string {
+	switch pst {
+	case ProcessStatusStarting:
+		return "starting"
+	case ProcessStatusRunning:
+		return "running"
+	case ProcessStatusFailed:
+		return "failed"
+	case ProcessStatusRestarting:
+		return "restarting"
+	case ProcessStatusStopped:
+		return "stopped"
+	case ProcessStatusCompleted:
+		return "completed"
+	default:
+		return "unknown"
+	}
+}
+
 // CommandExecutor interface defines the contract for command execution
 type CommandExecutor interface {
 	ExecuteCommands(commands []string) ([]ExecutionResult, error)
@@ -28,7 +60,7 @@ type CommandExecutor interface {
 // ProcessStatus represents the status of a keep-alive process
 type ProcessStatus struct {
 	Command      string
-	Status       string // "running", "failed", "restarting"
+	Status       ProcessStatusType
 	RestartCount int
 	LastRestart  time.Time
 	StartTime    time.Time
@@ -437,7 +469,7 @@ func (ce *commandExecutor) runKeepAliveProcess(command string) {
 	ce.mu.Lock()
 	ce.processes[command] = &ProcessStatus{
 		Command:      command,
-		Status:       "starting",
+		Status:       ProcessStatusStarting,
 		StartTime:    time.Now(),
 		RestartCount: 0,
 	}
@@ -447,7 +479,7 @@ func (ce *commandExecutor) runKeepAliveProcess(command string) {
 		// Check if we should stop
 		select {
 		case <-ce.stopSignal:
-			ce.updateProcessStatus(command, "stopped", restartCount)
+			ce.updateProcessStatus(command, ProcessStatusStopped, restartCount)
 			return
 		default:
 		}
@@ -455,7 +487,7 @@ func (ce *commandExecutor) runKeepAliveProcess(command string) {
 		// Parse command and arguments
 		parts := strings.Fields(command)
 		if len(parts) == 0 {
-			ce.updateProcessStatus(command, "failed", restartCount)
+			ce.updateProcessStatus(command, ProcessStatusFailed, restartCount)
 			return
 		}
 
@@ -470,9 +502,9 @@ func (ce *commandExecutor) runKeepAliveProcess(command string) {
 
 		// Update process status
 		if cmd.Process != nil {
-			ce.updateProcessStatusWithPID(command, "running", restartCount, cmd.Process.Pid)
+			ce.updateProcessStatusWithPID(command, ProcessStatusRunning, restartCount, cmd.Process.Pid)
 		} else {
-			ce.updateProcessStatus(command, "running", restartCount)
+			ce.updateProcessStatus(command, ProcessStatusRunning, restartCount)
 		}
 
 		fmt.Printf("Process started: %s (attempt %d)\n", command, restartCount+1)
@@ -490,7 +522,7 @@ func (ce *commandExecutor) runKeepAliveProcess(command string) {
 			fmt.Printf("Process died: %s (error: %v), restart count: %d\n", command, err, restartCount)
 
 			if restartCount <= maxRestarts {
-				ce.updateProcessStatus(command, "restarting", restartCount)
+				ce.updateProcessStatus(command, ProcessStatusRestarting, restartCount)
 
 				// Exponential backoff: 5s, 10s, 20s, 40s, max 60s
 				delay := time.Duration(5*(1<<uint(restartCount-1))) * time.Second
@@ -501,13 +533,13 @@ func (ce *commandExecutor) runKeepAliveProcess(command string) {
 				fmt.Printf("Restarting in %v...\n", delay)
 				time.Sleep(delay)
 			} else {
-				ce.updateProcessStatus(command, "failed", restartCount)
+				ce.updateProcessStatus(command, ProcessStatusFailed, restartCount)
 				fmt.Printf("Process %s failed permanently after %d restarts\n", command, maxRestarts)
 				return
 			}
 		} else {
 			// Process completed normally
-			ce.updateProcessStatus(command, "completed", restartCount)
+			ce.updateProcessStatus(command, ProcessStatusCompleted, restartCount)
 			fmt.Printf("Process completed normally: %s\n", command)
 			return
 		}
@@ -515,7 +547,7 @@ func (ce *commandExecutor) runKeepAliveProcess(command string) {
 }
 
 // updateProcessStatus updates the status of a process
-func (ce *commandExecutor) updateProcessStatus(command, status string, restartCount int) {
+func (ce *commandExecutor) updateProcessStatus(command string, status ProcessStatusType, restartCount int) {
 	ce.mu.Lock()
 	defer ce.mu.Unlock()
 
@@ -527,7 +559,7 @@ func (ce *commandExecutor) updateProcessStatus(command, status string, restartCo
 }
 
 // updateProcessStatusWithPID updates the status of a process with PID
-func (ce *commandExecutor) updateProcessStatusWithPID(command, status string, restartCount, pid int) {
+func (ce *commandExecutor) updateProcessStatusWithPID(command string, status ProcessStatusType, restartCount, pid int) {
 	ce.mu.Lock()
 	defer ce.mu.Unlock()
 
@@ -560,7 +592,7 @@ func (ce *commandExecutor) checkProcessHealth() {
 	defer ce.mu.RUnlock()
 
 	for command, process := range ce.processes {
-		if process.Status == "running" {
+		if process.Status == ProcessStatusRunning {
 			// Check if process is still in running map
 			if _, exists := ce.running[command]; !exists {
 				fmt.Printf("Process %s appears to have died unexpectedly\n", command)
