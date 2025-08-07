@@ -1,0 +1,32 @@
+# HamaShell Configuration Example
+
+projects:
+  myapp:
+    description: "Main application project"
+    stages:
+      dev:
+        services:
+          database:
+            description: "Development database connection"
+            commands:
+              - "ssh -i ${SSH_KEY_PATH} ${DB_USER}@dev-db.example.com"
+              - "mysql -u root -p${DB_PASSWORD}"
+          
+          api:
+            description: "Development API server"
+            commands:
+              - "ssh -i ${SSH_KEY_PATH} ${API_USER}@dev-api.example.com"
+              - "cd /app && npm start"
+
+      prod:
+        services:
+          database:
+            description: "Production database (read-only)"
+            commands:
+              - "ssh -i ${SSH_KEY_PATH} -L 3306:prod-db:3306 ${BASTION_USER}@bastion.example.com"
+              - "mysql -h localhost -u readonly -p${DB_PASSWORD}"
+
+global_settings:
+  timeout: 30
+  retries: 3
+  auto_restart: false
