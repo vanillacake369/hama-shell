@@ -4,7 +4,6 @@ package executor
 
 import (
 	"os/exec"
-	"syscall"
 	"testing"
 	"time"
 )
