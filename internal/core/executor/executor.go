@@ -2,6 +2,7 @@ package executor
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"sync"
@@ -56,6 +57,10 @@ func (e *executor) Run(key, command string) error {
 
 	// Platform-specific command setup
 	e.manager.setupCommand(cmd)
+
+	// Set user's console
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	// Start the command
 	if err := cmd.Start(); err != nil {
