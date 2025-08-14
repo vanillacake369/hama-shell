@@ -12,6 +12,9 @@ import (
 // AppConfig holds the parsed and validated configuration
 var AppConfig *config.Config
 
+// configFile holds the path to the configuration file
+var configFile string
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "hama-shell",
@@ -42,6 +45,9 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
+
+	// Add config file flag
+	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "config file (default is $HOME/hama-shell.yaml or ./hama-shell.yaml)")
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -51,7 +57,7 @@ func initConfig() {
 
 	// Try to parse and validate config
 	var err error
-	AppConfig, err = validator.ParseAndValidate("")
+	AppConfig, err = validator.ParseAndValidate(configFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Please check your configuration file or run 'hama-shell config generate' to create one.\n")
