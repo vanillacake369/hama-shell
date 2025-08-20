@@ -33,6 +33,14 @@ help:
 	@echo '  all           Run fmt, vet, test, and build'
 	@echo '  quick-check   Quick validation'
 	@echo '  help          Show this help'
+	@echo ''
+	@echo 'SSH Testing targets:'
+	@echo '  ssh-test-all  Complete SSH test environment setup with Zellij'
+	@echo '  ssh-setup     Initialize SSH test environment'
+	@echo '  ssh-server    Start SSH server on port 2222'
+	@echo '  ssh-client    Connect to test SSH server'
+	@echo '  ssh-status    Check SSH server status'
+	@echo '  ssh-clean     Clean up SSH test environment'
 
 ## build: Build the binary
 .PHONY: build
@@ -184,3 +192,100 @@ dev:
 verify: build
 	@echo "${BLUE}Verifying Cobra CLI is working...${NC}"
 	@./$(BINARY_NAME) --help > /dev/null 2>&1 && echo "${GREEN}✓ CLI is working properly${NC}" || echo "✗ CLI failed"
+
+# SSH Testing Environment Variables
+SSH_TEST_DIR := .ssh-test
+SSH_TEST_PORT := 2222
+SSH_TEST_USER := $(shell whoami)
+SSH_TEST_HOST := 127.0.0.1
+ZELLIJ_SESSION := hama-ssh-test
+
+## ssh-test-all: Complete SSH test environment setup with Zellij
+.PHONY: ssh-test-all
+ssh-test-all: ssh-clean ssh-setup
+	@echo "${BLUE}Starting complete SSH test environment...${NC}"
+	@$(MAKE) ssh-server-bg
+	@sleep 2
+	@echo "${GREEN}✓ SSH test environment ready${NC}"
+	@echo "${BLUE}Launching Zellij with SSH test panes...${NC}"
+	@$(MAKE) ssh-test-zellij
+
+## ssh-setup: Initialize SSH test environment
+.PHONY: ssh-setup
+ssh-setup:
+	@echo "${BLUE}Setting up SSH test environment...${NC}"
+	@mkdir -p "$(SSH_TEST_DIR)/sshd" "$(SSH_TEST_DIR)/client"
+	@chmod 700 "$(SSH_TEST_DIR)/client"
+	@echo "Generating SSH host keys..."
+	@ssh-keygen -t ed25519 -f "$(SSH_TEST_DIR)/sshd/ssh_host_ed25519_key" -N "" -q
+	@ssh-keygen -t rsa -b 4096 -f "$(SSH_TEST_DIR)/sshd/ssh_host_rsa_key" -N "" -q
+	@echo "Generating client key..."
+	@[ -f "$(SSH_TEST_DIR)/client/id_ed25519" ] || ssh-keygen -t ed25519 -f "$(SSH_TEST_DIR)/client/id_ed25519" -N "" -q
+	@echo "Setting up authorized_keys..."
+	@cat "$(SSH_TEST_DIR)/client/id_ed25519.pub" > "$(SSH_TEST_DIR)/client/authorized_keys"
+	@chmod 600 "$(SSH_TEST_DIR)/client/authorized_keys"
+	@echo "Creating sshd_config..."
+	@cat > "$(SSH_TEST_DIR)/sshd/sshd_config" <<< 'Port $(SSH_TEST_PORT)\nListenAddress $(SSH_TEST_HOST)\nProtocol 2\nPidFile $(PWD)/$(SSH_TEST_DIR)/sshd/sshd.pid\nHostKey $(PWD)/$(SSH_TEST_DIR)/sshd/ssh_host_ed25519_key\nHostKey $(PWD)/$(SSH_TEST_DIR)/sshd/ssh_host_rsa_key\nPasswordAuthentication no\nPubkeyAuthentication yes\nAuthorizedKeysFile $(PWD)/$(SSH_TEST_DIR)/client/authorized_keys\nUsePAM no\nChallengeResponseAuthentication no\nPermitRootLogin no\nLogLevel VERBOSE'
+	@echo "${GREEN}✓ SSH test environment setup complete${NC}"
+
+## ssh-server-bg: Start SSH server in background
+.PHONY: ssh-server-bg
+ssh-server-bg: ssh-setup
+	@echo "${BLUE}Starting SSH server on port $(SSH_TEST_PORT)...${NC}"
+	@if [ -f "$(SSH_TEST_DIR)/sshd/sshd.pid" ] && kill -0 `cat "$(SSH_TEST_DIR)/sshd/sshd.pid"` 2>/dev/null; then \
+		echo "SSH server already running"; \
+	else \
+		$(shell which sshd) -f "$(PWD)/$(SSH_TEST_DIR)/sshd/sshd_config"; \
+		echo "${GREEN}✓ SSH server started${NC}"; \
+	fi
+
+## ssh-server: Start SSH server in foreground (for monitoring)
+.PHONY: ssh-server
+ssh-server: ssh-setup
+	@echo "${BLUE}Starting SSH server on port $(SSH_TEST_PORT) (foreground)...${NC}"
+	@$(shell which sshd) -f "$(PWD)/$(SSH_TEST_DIR)/sshd/sshd_config" -D
+
+## ssh-client: Connect to test SSH server
+.PHONY: ssh-client
+ssh-client:
+	@echo "${BLUE}Connecting to SSH test server...${NC}"
+	@ssh-keygen -R "[$(SSH_TEST_HOST)]:$(SSH_TEST_PORT)" 2>/dev/null || true
+	@ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i "$(SSH_TEST_DIR)/client/id_ed25519" -p $(SSH_TEST_PORT) $(SSH_TEST_USER)@$(SSH_TEST_HOST)
+
+## ssh-test-zellij: Launch Zellij with SSH test panes
+.PHONY: ssh-test-zellij
+ssh-test-zellij:
+	@echo "${BLUE}Launching Zellij session: $(ZELLIJ_SESSION)${NC}"
+	@zellij kill-session $(ZELLIJ_SESSION) 2>/dev/null || true
+	@zellij --session $(ZELLIJ_SESSION) --layout - <<< 'layout {\n  pane size=1 borderless=true {\n    plugin location="zellij:compact-bar"\n  }\n  pane split_direction="vertical" {\n    pane {\n      name "SSH Server"\n      command "make"\n      args "ssh-server"\n    }\n    pane {\n      name "SSH Client"\n      command "bash"\n      args "-c" "echo '\''SSH Client Ready. Run: make ssh-client'\'' && bash"\n    }\n  }\n}'
+
+## ssh-status: Check SSH server status
+.PHONY: ssh-status
+ssh-status:
+	@echo "${BLUE}Checking SSH server status...${NC}"
+	@if [ -f "$(SSH_TEST_DIR)/sshd/sshd.pid" ]; then \
+		if kill -0 `cat "$(SSH_TEST_DIR)/sshd/sshd.pid"` 2>/dev/null; then \
+			echo "${GREEN}✓ SSH server is running (PID: `cat "$(SSH_TEST_DIR)/sshd/sshd.pid"`)${NC}"; \
+			echo "Port $(SSH_TEST_PORT) status:"; \
+			netstat -ln | grep ":$(SSH_TEST_PORT)" || echo "Port not found in netstat"; \
+		else \
+			echo "SSH server PID file exists but process is not running"; \
+		fi; \
+	else \
+		echo "SSH server is not running"; \
+	fi
+
+## ssh-clean: Clean up SSH test environment
+.PHONY: ssh-clean
+ssh-clean:
+	@echo "${BLUE}Cleaning SSH test environment...${NC}"
+	@if [ -f "$(SSH_TEST_DIR)/sshd/sshd.pid" ]; then \
+		if kill -0 `cat "$(SSH_TEST_DIR)/sshd/sshd.pid"` 2>/dev/null; then \
+			kill `cat "$(SSH_TEST_DIR)/sshd/sshd.pid"` 2>/dev/null || true; \
+			echo "Stopped SSH server"; \
+		fi; \
+	fi
+	@rm -rf "$(SSH_TEST_DIR)" 2>/dev/null || true
+	@ssh-keygen -R "[$(SSH_TEST_HOST)]:$(SSH_TEST_PORT)" 2>/dev/null || true
+	@zellij kill-session $(ZELLIJ_SESSION) 2>/dev/null || true
+	@echo "${GREEN}✓ SSH test environment cleaned${NC}"
