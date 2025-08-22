@@ -3,7 +3,6 @@ package executor
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
-	"runtime"
 	"testing"
 )
 
@@ -15,18 +14,15 @@ func TestExecutor_Run_Success(t *testing.T) {
 		t.Fatal("Expected executor to be created, got nil")
 	}
 	testKey := "test.service"
-	var testCommand string
-	if runtime.GOOS == "windows" {
-		testCommand = "echo 'this is a test'"
-	} else {
-		testCommand = "echo 'this is a test'"
+	testCommands := []string{
+		"cd ~/dev/tonys-nix/",
 	}
 
 	// WHEN
-	// Test the Run method
-	err := exec.Run(testKey, testCommand)
+	// Test the RunSequence method
+	err := exec.RunSequence(testKey, testCommands)
 	if err != nil {
-		t.Fatalf("Expected Run to succeed, got error: %v", err)
+		t.Fatalf("Expected RunSequence to succeed, got error: %v", err)
 	}
 
 	// THEN
@@ -46,20 +42,18 @@ func TestExecutor_MultipleRun_Success(t *testing.T) {
 		t.Fatal("Expected executor to be created, got nil")
 	}
 	testKey := "test.service"
-	var testCommand []string
-	testCommand = append(testCommand, "echo 'this is a test1'")
-	testCommand = append(testCommand, "echo 'this is a test2'")
-	testCommand = append(testCommand, "echo 'this is a test3'")
-	testCommand = append(testCommand, "echo 'this is a test4'")
-	testCommand = append(testCommand, "echo 'this is a test5'")
+	testCommands := []string{
+		"cd ~/dev/tonys-nix/",
+		"pwd",
+		"ls -al",
+		// "make help",
+	}
 
 	// WHEN
-	// Test the Run method
-	for _, command := range testCommand {
-		err := exec.Run(testKey, command)
-		if err != nil {
-			t.Fatalf("Expected Run to succeed, got error: %v", err)
-		}
+	// Test the RunSequence method
+	err := exec.RunSequence(testKey, testCommands)
+	if err != nil {
+		t.Fatalf("Expected RunSequence to succeed, got error: %v", err)
 	}
 
 	// THEN

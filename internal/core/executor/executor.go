@@ -5,14 +5,16 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
 
 // Executor defines the interface for process execution and management
 type Executor interface {
-	// Run starts a command associated with the given key
-	Run(key, command string) error
+
+	// RunSequence runs a sequence of commands in a single shell session
+	RunSequence(key string, commands []string) error
 
 	// StopAll terminates all running processes
 	StopAll() error
@@ -46,8 +48,14 @@ func New() Executor {
 	}
 }
 
-// Run starts a new process and associates it with the given key
-func (e *executor) Run(key, command string) error {
+// RunSequence runs a sequence of commands in a single shell session
+func (e *executor) RunSequence(key string, commands []string) error {
+	if len(commands) == 0 {
+		return fmt.Errorf("no commands provided")
+	}
+
+	// Join commands with && to run in single shell with proper state sharing
+	command := strings.Join(commands, " && ")
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.Command("cmd", "/c", command)

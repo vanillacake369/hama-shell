@@ -54,12 +54,10 @@ Examples:
 
 		fmt.Printf("Starting session '%s' with %d commands in keep-alive mode...\n", sessionPath, len(commands))
 		executor := executor.New()
-		
+
 		// Run each command independently
-		for _, command := range commands {
-			if err := executor.Run(sessionPath, command); err != nil {
-				fmt.Printf("Error starting command '%s': %s\n", command, err)
-			}
+		if err := executor.RunSequence(sessionPath, commands); err != nil {
+			fmt.Printf("Error starting command '%s': %s\n", commands, err)
 		}
 	},
 }
