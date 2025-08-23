@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -13,9 +14,68 @@ import (
 // unixProcessManager implements processManager for Unix-like systems
 type unixProcessManager struct{}
 
+// platformCapabilities describes what process management features are supported
+type platformCapabilities struct {
+	supportsSessionCreation bool
+	supportsProcessGroup    bool
+	supportsCombinedSetup   bool
+	platformName           string
+}
+
 // newProcessManager creates a new platform-specific process manager
 func newProcessManager() processManager {
 	return &unixProcessManager{}
+}
+
+// getPlatformCapabilities returns the capabilities of the current platform
+func (m *unixProcessManager) getPlatformCapabilities() platformCapabilities {
+	switch runtime.GOOS {
+	case "darwin":
+		// macOS: Session creation works, but Setsid+Setpgid combination fails
+		return platformCapabilities{
+			supportsSessionCreation: true,
+			supportsProcessGroup:    true,
+			supportsCombinedSetup:   false, // Key limitation on macOS
+			platformName:           "macOS/Darwin",
+		}
+	case "linux":
+		// Linux: Full session and process group support
+		return platformCapabilities{
+			supportsSessionCreation: true,
+			supportsProcessGroup:    true,
+			supportsCombinedSetup:   true,
+			platformName:           "Linux",
+		}
+	default:
+		// Other Unix systems: Conservative approach
+		return platformCapabilities{
+			supportsSessionCreation: true,
+			supportsProcessGroup:    true,
+			supportsCombinedSetup:   true,
+			platformName:           runtime.GOOS,
+		}
+	}
+}
+
+// getPlatformSpecificSysProcAttr returns OS-appropriate SysProcAttr configuration
+func (m *unixProcessManager) getPlatformSpecificSysProcAttr() *syscall.SysProcAttr {
+	capabilities := m.getPlatformCapabilities()
+	
+	if capabilities.supportsCombinedSetup {
+		// Full session + process group setup (Linux and other Unix)
+		return &syscall.SysProcAttr{
+			Setsid:  true, // Create new session
+			Setpgid: true, // Create new process group
+			Pgid:    0,    // PGID = PID (become group leader)
+		}
+	} else {
+		// Session-only setup (macOS) - automatically becomes process group leader
+		return &syscall.SysProcAttr{
+			Setsid: true, // Create new session (sufficient on macOS)
+			// Note: When Setsid=true, the process automatically becomes process group leader
+			// Setting Setpgid=true causes "operation not permitted" on macOS
+		}
+	}
 }
 
 // setupCommand configures Unix-specific command settings
@@ -28,12 +88,11 @@ func (m *unixProcessManager) setupCommand(cmd *exec.Cmd) {
 
 // setupSupervisor configures supervisor with session/PGID settings
 func (m *unixProcessManager) setupSupervisor(cmd *exec.Cmd) error {
-	// Create new session and process group for supervisor
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid:  true, // Create new session
-		Setpgid: true, // Create new process group
-		Pgid:    0,    // PGID = PID (become group leader)
+	if cmd == nil {
+		return fmt.Errorf("command cannot be nil")
 	}
+	// Use platform-specific configuration to avoid macOS restrictions
+	cmd.SysProcAttr = m.getPlatformSpecificSysProcAttr()
 	return nil
 }
 
