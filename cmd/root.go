@@ -52,6 +52,18 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
+	// Only load config if it's actually needed
+	// Config commands, help commands, and bare command should work without config
+	if len(os.Args) > 1 {
+		// Skip config loading for config-related commands
+		if os.Args[1] == "config" || os.Args[1] == "help" || os.Args[1] == "--help" || os.Args[1] == "-h" {
+			return
+		}
+	} else {
+		// No arguments - just show help, don't require config
+		return
+	}
+
 	// Create validator and parse config
 	validator := config.NewValidator()
 
