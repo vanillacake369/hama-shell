@@ -2,68 +2,44 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
-	"hama-shell/internal/core/executor"
 
 	"hama-shell/internal/core/config"
+	"hama-shell/internal/core/executor"
+	"hama-shell/internal/core/session"
+)
+
+// sessionManager is a singleton instance used across commands
+var sessionManager = session.NewManager(
+	executor.New(),
+	config.NewService(),
 )
 
 var startCmd = &cobra.Command{
-	Use:   "start [session-path]",
+	Use:   "start [project.stage.service]",
 	Short: "Start a session",
-	Long: `Start a session based on the configuration path.
+	Long: `Start a session for the specified target.
+
+The target should be in the format: project.stage.service
 
 Examples:
-  hama-shell start project.stage.developer.session
-  hama-shell start --all`,
-	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		all, _ := cmd.Flags().GetBool("all")
+  hama-shell start myapp.dev.api
+  hama-shell start monitoring.prod.prometheus`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		target := args[0]
 
-		if all {
-			fmt.Println("Starting all sessions...")
-			// TODO: Implement start all logic
-			return
+		// Delegate to session manager
+		if err := sessionManager.Start(target, configFile); err != nil {
+			return fmt.Errorf("failed to start session: %w", err)
 		}
 
-		if len(args) == 0 {
-			fmt.Println("Error: session path required")
-			cmd.Help()
-			return
-		}
-
-		sessionPath := args[0]
-
-		// Check if AppConfig is available
-		if AppConfig == nil {
-			fmt.Println("Error: Configuration not loaded")
-			return
-		}
-
-		// Get commands from static config
-		commands, err := config.GetCommands(AppConfig, sessionPath)
-		if err != nil {
-			fmt.Printf("Error getting commands for session '%s': %s\n", sessionPath, err)
-			return
-		}
-
-		if len(commands) == 0 {
-			fmt.Printf("No commands found for session: %s\n", sessionPath)
-			return
-		}
-
-		fmt.Printf("Starting session '%s' with %d commands in keep-alive mode...\n", sessionPath, len(commands))
-		executor := executor.New()
-
-		// Run each command independently
-		if err := executor.RunSequence(sessionPath, commands); err != nil {
-			fmt.Printf("Error starting command '%s': %s\n", commands, err)
-		}
+		fmt.Printf("✓ Started session: %s\n", target)
+		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(startCmd)
-
-	startCmd.Flags().BoolP("all", "a", false, "Start all configured sessions")
 }
