@@ -34,8 +34,13 @@ func NewManager(exec executor.Executor, cfgSvc ConfigService) *Manager {
 	}
 }
 
-// Start initiates a session for the given target
+// Start initiates a session for the given target (background mode)
 func (m *Manager) Start(target string, configPath string) error {
+	return m.StartWithMode(target, configPath, executor.ExecutionModeBackground)
+}
+
+// StartWithMode initiates a session for the given target with specified execution mode
+func (m *Manager) StartWithMode(target string, configPath string, mode executor.ExecutionMode) error {
 	// Load configuration
 	cfg, err := m.configSvc.Load(configPath)
 	if err != nil {
@@ -48,8 +53,8 @@ func (m *Manager) Start(target string, configPath string) error {
 		return fmt.Errorf("failed to resolve target: %w", err)
 	}
 
-	// Execute commands using RunSequence
-	if err := m.executor.RunSequence(target, svc.Commands); err != nil {
+	// Execute commands using RunSequenceWithMode
+	if err := m.executor.RunSequenceWithMode(target, svc.Commands, mode); err != nil {
 		return fmt.Errorf("failed to execute commands: %w", err)
 	}
 
