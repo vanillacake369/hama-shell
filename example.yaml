@@ -11,9 +11,10 @@ projects:
           db:
             description: "PostgreSQL database connection"
             commands:
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
-              - ssh -L 3306:${TARGET_HOST}:3306 ubuntu@${BASTION_HOST} -N
+              - ssh limjihoon@127.0.0.1
+              - 1026
+              - whoami
+              - pwd
 
           server:
             description: "Application server"
