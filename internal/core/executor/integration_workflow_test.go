@@ -50,7 +50,7 @@ func TestWorkflow_CompleteShellSequence(t *testing.T) {
 	}
 	// Set process to nil since we can't mock os.Process directly
 	
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return(mockSession, nil)
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return(mockSession, nil)
 	
 	manageSupCalled := make(chan bool, 1)
 	signalMgr.On("manageSupervisor", mockSession).Run(func(args mock.Arguments) {
@@ -118,7 +118,7 @@ func TestWorkflow_SSHOnlySequence(t *testing.T) {
 	}
 	// Process set to nil for testing
 	
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return(mockSession, nil)
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return(mockSession, nil)
 	
 	manageSupCalled := make(chan bool, 1)
 	signalMgr.On("manageSupervisor", mockSession).Run(func(args mock.Arguments) {
@@ -202,7 +202,7 @@ func TestWorkflow_MixedShellAndSSHSequence(t *testing.T) {
 	}
 	// Process set to nil for testing
 	
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return(mockSession, nil)
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return(mockSession, nil)
 	
 	manageSupCalled := make(chan bool, 1)
 	signalMgr.On("manageSupervisor", mockSession).Run(func(args mock.Arguments) {
@@ -276,7 +276,7 @@ func TestWorkflow_MultipleSessionsManagement(t *testing.T) {
 		// Process set to nil for testing
 		mockSessions = append(mockSessions, mockSession)
 		
-		supervisorMgr.On("createSupervisor", s.key, mock.AnythingOfType("[]executor.CommandSegment")).Return(mockSession, nil)
+		supervisorMgr.On("createSupervisor", s.key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return(mockSession, nil)
 		
 		manageCalled := make(chan bool, 1)
 		manageCalls = append(manageCalls, manageCalled)
@@ -354,7 +354,7 @@ func TestWorkflow_SessionRecoveryAfterFailure(t *testing.T) {
 	}
 	// Process set to nil for testing
 	
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return(mockSession, nil)
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return(mockSession, nil)
 	
 	manageSupCalled := make(chan bool, 1)
 	signalMgr.On("manageSupervisor", mockSession).Run(func(args mock.Arguments) {
@@ -448,7 +448,7 @@ func TestWorkflow_ComplexSSHJumpHost(t *testing.T) {
 	}
 	// Process set to nil for testing
 	
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return(mockSession, nil)
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return(mockSession, nil)
 	
 	manageSupCalled := make(chan bool, 1)
 	signalMgr.On("manageSupervisor", mockSession).Run(func(args mock.Arguments) {
