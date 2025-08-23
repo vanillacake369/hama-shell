@@ -123,10 +123,10 @@ func TestExecutor_StopAll_Success(t *testing.T) {
 	// THEN: should succeed
 	assert.NoError(t, err)
 	
-	// AND: all sessions should be removed
-	time.Sleep(100 * time.Millisecond) // Brief wait for cleanup
+	// AND: all sessions should be removed (with proper cleanup time)
+	time.Sleep(500 * time.Millisecond) // Wait for cleanup to complete
 	status = e.GetStatus()
-	assert.Empty(t, status)
+	assert.Empty(t, status, "All sessions should be cleaned up after StopAll()")
 }
 
 func TestExecutor_StopAll_EmptyRegistry(t *testing.T) {
@@ -242,8 +242,8 @@ type MockSupervisorManager struct {
 	mock.Mock
 }
 
-func (m *MockSupervisorManager) createSupervisor(key string, segments []CommandSegment) (*SessionGroup, error) {
-	args := m.Called(key, segments)
+func (m *MockSupervisorManager) createSupervisor(key string, segments []CommandSegment, mode ExecutionMode) (*SessionGroup, error) {
+	args := m.Called(key, segments, mode)
 	return args.Get(0).(*SessionGroup), args.Error(1)
 }
 
@@ -301,7 +301,7 @@ func TestExecutor_MockedComponents_RunSequence(t *testing.T) {
 		StartTime: time.Now(),
 		Done:      make(chan struct{}),
 	}
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return(mockSession, nil)
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return(mockSession, nil)
 	
 	// Use a channel to signal when manageSupervisor is called
 	manageSupCalled := make(chan bool, 1)

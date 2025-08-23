@@ -22,7 +22,7 @@ func TestSupervisorManager_createSupervisor_Success(t *testing.T) {
 	mockPM.On("setupSupervisor", mock.AnythingOfType("*exec.Cmd")).Return(nil)
 
 	// WHEN: creating supervisor
-	session, err := sm.createSupervisor("test-key", segments)
+	session, err := sm.createSupervisor("test-key", segments, ExecutionModeBackground)
 
 	// THEN: supervisor should be created successfully
 	assert.NoError(t, err)
@@ -40,7 +40,7 @@ func TestSupervisorManager_createSupervisor_NoSegments(t *testing.T) {
 	segments := []CommandSegment{}
 
 	// WHEN: creating supervisor with empty segments
-	session, err := sm.createSupervisor("test-key", segments)
+	session, err := sm.createSupervisor("test-key", segments, ExecutionModeBackground)
 
 	// THEN: should return error
 	assert.Error(t, err)
@@ -62,12 +62,12 @@ func TestSupervisorManager_createSupervisor_SetupError(t *testing.T) {
 	mockPM.On("setupSupervisor", mock.AnythingOfType("*exec.Cmd")).Return(assert.AnError)
 
 	// WHEN: creating supervisor
-	session, err := sm.createSupervisor("test-key", segments)
+	session, err := sm.createSupervisor("test-key", segments, ExecutionModeBackground)
 
-	// THEN: should return setup error
+	// THEN: should return setup error with platform information
 	assert.Error(t, err)
 	assert.Nil(t, session)
-	assert.Contains(t, err.Error(), "failed to setup supervisor")
+	assert.Contains(t, err.Error(), "all execution strategies failed")
 	mockPM.AssertExpectations(t)
 }
 
@@ -79,7 +79,7 @@ func TestSupervisorManager_buildSupervisorScript_ShellSegment(t *testing.T) {
 	}
 
 	// WHEN: building supervisor script
-	script := sm.buildSupervisorScript(segments)
+	script := sm.buildSupervisorScript(segments, ExecutionModeBackground)
 
 	// THEN: script should contain shell commands joined with &&
 	assert.Contains(t, script, "#!/bin/bash")
@@ -98,7 +98,7 @@ func TestSupervisorManager_buildSupervisorScript_SSHSegment(t *testing.T) {
 	}
 
 	// WHEN: building supervisor script
-	script := sm.buildSupervisorScript(segments)
+	script := sm.buildSupervisorScript(segments, ExecutionModeBackground)
 
 	// THEN: script should contain SSH helper call
 	assert.Contains(t, script, "#!/bin/bash")
@@ -115,7 +115,7 @@ func TestSupervisorManager_buildSupervisorScript_SSHWithoutPassword(t *testing.T
 	}
 
 	// WHEN: building supervisor script
-	script := sm.buildSupervisorScript(segments)
+	script := sm.buildSupervisorScript(segments, ExecutionModeBackground)
 
 	// THEN: script should execute SSH directly
 	assert.Contains(t, script, "#!/bin/bash")
@@ -133,7 +133,7 @@ func TestSupervisorManager_buildSupervisorScript_MixedSegments(t *testing.T) {
 	}
 
 	// WHEN: building supervisor script
-	script := sm.buildSupervisorScript(segments)
+	script := sm.buildSupervisorScript(segments, ExecutionModeBackground)
 
 	// THEN: script should contain all segments properly formatted
 	assert.Contains(t, script, "#!/bin/bash")
@@ -167,7 +167,7 @@ func TestSupervisorManager_buildSupervisorScript_EmptySegments(t *testing.T) {
 	}
 
 	// WHEN: building supervisor script
-	script := sm.buildSupervisorScript(segments)
+	script := sm.buildSupervisorScript(segments, ExecutionModeBackground)
 
 	// THEN: script should be created but segments should be skipped
 	assert.Contains(t, script, "#!/bin/bash")
@@ -186,7 +186,7 @@ func TestSupervisorManager_buildSupervisorScript_UnknownSegmentType(t *testing.T
 	}
 
 	// WHEN: building supervisor script
-	script := sm.buildSupervisorScript(segments)
+	script := sm.buildSupervisorScript(segments, ExecutionModeBackground)
 
 	// THEN: script should handle unknown type gracefully
 	assert.Contains(t, script, "#!/bin/bash")
@@ -246,7 +246,7 @@ func TestSupervisorManager_addSSHSegmentToScript(t *testing.T) {
 			var script strings.Builder
 			
 			// WHEN: adding SSH segment to script
-			sm.addSSHSegmentToScript(&script, i, tt.segment)
+			sm.addSSHSegmentToScript(&script, i, tt.segment, ExecutionModeBackground)
 			result := script.String()
 			
 			// THEN: script should contain expected content
@@ -267,7 +267,7 @@ func TestSupervisorManager_addShellSegmentToScript(t *testing.T) {
 	var script strings.Builder
 
 	// WHEN: adding shell segment to script
-	sm.addShellSegmentToScript(&script, 0, segment)
+	sm.addShellSegmentToScript(&script, 0, segment, ExecutionModeBackground)
 	result := script.String()
 
 	// THEN: script should contain shell commands joined with &&
@@ -286,7 +286,7 @@ func TestSupervisorManager_addShellSegmentToScript_EmptyCommands(t *testing.T) {
 	var script strings.Builder
 
 	// WHEN: adding empty shell segment to script
-	sm.addShellSegmentToScript(&script, 0, segment)
+	sm.addShellSegmentToScript(&script, 0, segment, ExecutionModeBackground)
 	result := script.String()
 
 	// THEN: script should be empty (segment skipped)

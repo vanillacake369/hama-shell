@@ -32,19 +32,55 @@ func TestErrorHandling_SupervisorCreationFailure(t *testing.T) {
 	key := "test.project.service"
 	commands := []string{"echo 'test'", "ls -la"}
 	
-	// Mock supervisor creation failure
-	supervisorError := errors.New("failed to start supervisor: permission denied")
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return((*SessionGroup)(nil), supervisorError)
+	// Mock supervisor creation failure (non-process-creation error to avoid fallback)
+	supervisorError := errors.New("failed to start supervisor: command not found")
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return((*SessionGroup)(nil), supervisorError)
 	
 	// WHEN: running sequence with supervisor creation failure
 	err := executor.RunSequence(key, commands)
 	
-	// THEN: should return supervisor creation error
+	// THEN: should return supervisor creation error (not process creation error, so no fallback)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to create supervisor session")
-	assert.Contains(t, err.Error(), "permission denied")
+	assert.Contains(t, err.Error(), "command not found")
 	
 	// AND: session should not be registered
+	status := executor.GetStatus()
+	assert.Empty(t, status)
+	
+	supervisorMgr.AssertExpectations(t)
+}
+
+func TestErrorHandling_ProcessCreationErrorFallback(t *testing.T) {
+	// GIVEN: executor with supervisor manager that fails with process creation error
+	registry := NewSessionRegistry()
+	parser := NewCommandParser()
+	supervisorMgr := &MockSupervisorManager{}
+	signalMgr := &MockSignalManager{}
+	sshMgr := &MockSSHManager{}
+	
+	executor := &executor{
+		registry:      registry,
+		parser:        CommandParserInterface(parser),
+		supervisorMgr: SupervisorManagerInterface(supervisorMgr),
+		signalMgr:     SignalManagerInterface(signalMgr),
+		sshMgr:        SSHManagerInterface(sshMgr),
+	}
+	
+	key := "test.fallback.service"
+	commands := []string{"echo 'fallback test'", "pwd"}
+	
+	// Mock supervisor creation with process creation error (triggers fallback)
+	processCreationError := errors.New("fork/exec /bin/bash: operation not permitted")
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return((*SessionGroup)(nil), processCreationError)
+	
+	// WHEN: running sequence with process creation error
+	err := executor.RunSequence(key, commands)
+	
+	// THEN: should succeed (fallback to direct mode)
+	assert.NoError(t, err, "Process creation error should trigger successful fallback to direct mode")
+	
+	// AND: session should not be registered (direct mode doesn't register sessions)
 	status := executor.GetStatus()
 	assert.Empty(t, status)
 	
@@ -272,7 +308,7 @@ func TestErrorHandling_ConcurrentAccessErrors(t *testing.T) {
 			Supervisor: &exec.Cmd{},
 		}
 		
-		supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return(mockSession, nil)
+		supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return(mockSession, nil)
 		signalMgr.On("manageSupervisor", mockSession).Return()
 		signalMgr.On("gracefulShutdown", mockSession, 30*time.Second).Return(nil)
 	}
@@ -341,7 +377,7 @@ func TestErrorHandling_ResourceExhaustion(t *testing.T) {
 	
 	// Mock resource exhaustion error
 	resourceError := errors.New("failed to start supervisor: cannot allocate memory")
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return((*SessionGroup)(nil), resourceError)
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return((*SessionGroup)(nil), resourceError)
 	
 	// WHEN: running sequence that exhausts resources
 	err := executor.RunSequence(key, commands)
@@ -505,7 +541,7 @@ func TestErrorHandling_NetworkRelatedErrors(t *testing.T) {
 	
 	// Mock supervisor creation that would handle network errors
 	networkError := errors.New("failed to start supervisor: network unreachable")
-	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment")).Return((*SessionGroup)(nil), networkError)
+	supervisorMgr.On("createSupervisor", key, mock.AnythingOfType("[]executor.CommandSegment"), mock.AnythingOfType("executor.ExecutionMode")).Return((*SessionGroup)(nil), networkError)
 	
 	// WHEN: running sequence with network connectivity issues
 	err := executor.RunSequence(key, commands)
