@@ -1,23 +1,38 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
 	"hama-shell/internal/core/config"
 )
+
+// configService singleton instance (reused from start.go pattern)
+var configServiceInstance = config.NewService()
+
+// getConfigPath helper function to get config path from args or global flag
+func getConfigPath(args []string) string {
+	if len(args) > 0 {
+		return args[0]
+	}
+	return configFile // Use global flag from root.go
+}
 
 // configCmd represents the config command
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage configuration",
-	Long: `Manage HamaShell configuration including validation, templates, and settings.
+	Long: `Manage HamaShell configuration including validation, display, listing, and generation.
 
 Examples:
   hama-shell config validate
   hama-shell config show
+  hama-shell config list
   hama-shell config generate`,
 }
 
@@ -31,207 +46,323 @@ Examples:
   hama-shell config validate
   hama-shell config validate /path/to/config.yaml`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		var configFile string
-		if len(args) > 0 {
-			configFile = args[0]
-		}
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfgPath := getConfigPath(args)
 
-		if configFile == "" {
+		if cfgPath != "" {
+			fmt.Printf("Validating configuration file: %s\n", cfgPath)
+		} else {
 			fmt.Println("Validating default configuration...")
-		} else {
-			fmt.Printf("Validating configuration file: %s\n", configFile)
 		}
 
-		// Create validator
-		validator := config.NewValidator()
-
-		// If specific config file provided, load it temporarily
-		if configFile != "" {
-			// Save current viper config
-			currentConfig := viper.AllSettings()
-
-			// Load specific file into viper temporarily
-			viper.Reset()
-			viper.SetConfigFile(configFile)
-			if err := viper.ReadInConfig(); err != nil {
-				fmt.Printf("Error reading config file: %s\n", err)
-				return
-			}
-
-			// Validate the temporary config
-			if err := validator.ValidateViper(); err != nil {
-				fmt.Printf("Validation failed: %s\n", err)
-				return
-			}
-
-			// Restore original viper config
-			viper.Reset()
-			for key, value := range currentConfig {
-				viper.Set(key, value)
-			}
-		} else {
-			// Validate current viper config
-			if err := validator.ValidateViper(); err != nil {
-				fmt.Printf("Validation failed: %s\n", err)
-				return
-			}
+		// Use config service to load and validate
+		cfg, err := configServiceInstance.Load(cfgPath)
+		if err != nil {
+			return fmt.Errorf("validation failed: %w", err)
 		}
 
-		fmt.Println("✓ Configuration is valid")
+		fmt.Printf("✓ Configuration is valid (%d projects found)\n", len(cfg.Projects))
+		return nil
 	},
 }
 
 // configShowCmd shows .yaml holding config
 var configShowCmd = &cobra.Command{
 	Use:   "show [config-file]",
-	Short: "Show configuration file",
-	Long: `Show the configuration file syntax and structure.
+	Short: "Show configuration structure",
+	Long: `Show the configuration file structure in a readable format.
 
 Examples:
   hama-shell config show
   hama-shell config show /path/to/config.yaml`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		var configFile string
-		if len(args) > 0 {
-			configFile = args[0]
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfgPath := getConfigPath(args)
+
+		// Load configuration
+		cfg, err := configServiceInstance.Load(cfgPath)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
 		}
 
-		if configFile == "" {
-			fmt.Println("Showing default configuration...")
-		} else {
-			fmt.Printf("Showing configuration file: %s\n", configFile)
-		}
-
-		// Create validator
-		validator := config.NewValidator()
-
-		// If specific config file provided, show that file
-		if configFile != "" {
-			// Save current viper config
-			currentConfig := viper.AllSettings()
-
-			// Load specific file into viper temporarily
-			viper.Reset()
-			viper.SetConfigFile(configFile)
-			if err := viper.ReadInConfig(); err != nil {
-				fmt.Printf("Error reading config file: %s\n", err)
-				return
-			}
-
-			// Show the config structure
-			showConfigStructure(validator)
-
-			// Restore original viper config
-			viper.Reset()
-			for key, value := range currentConfig {
-				viper.Set(key, value)
-			}
-		} else {
-			// Show current viper config
-			showConfigStructure(validator)
-		}
+		// Display configuration structure
+		showConfigStructure(cfg)
+		return nil
 	},
 }
 
 // showConfigStructure displays the config structure in a readable format
-func showConfigStructure(validator *config.Validator) {
+func showConfigStructure(cfg *config.Config) {
 	fmt.Println("Configuration Structure:")
 	fmt.Println("========================")
 
-	// Static config load fail
-	if AppConfig == nil {
-		fmt.Println("Configuration Load failed")
-	}
-	showStaticConfigStructure(AppConfig)
-}
-
-// showStaticConfigStructure shows config from parsed static config
-func showStaticConfigStructure(cfg *config.Config) {
-	if len(cfg.Projects) == 0 {
+	if cfg == nil || len(cfg.Projects) == 0 {
 		fmt.Println("No projects found")
 		return
 	}
 
+	// Display projects with emojis for better UX
 	for projectName, project := range cfg.Projects {
-		fmt.Printf("Project: %s\n", projectName)
+		fmt.Printf("\n📁 Project: %s\n", projectName)
 		if project.Description != "" {
-			fmt.Printf("  Description: %s\n", project.Description)
+			fmt.Printf("   Description: %s\n", project.Description)
 		}
 
 		for stageName, stage := range project.Stages {
-			fmt.Printf("  Stage: %s\n", stageName)
+			fmt.Printf("\n   🔧 Stage: %s\n", stageName)
 			if stage.Description != "" {
-				fmt.Printf("    Description: %s\n", stage.Description)
+				fmt.Printf("      Description: %s\n", stage.Description)
 			}
 
 			for serviceName, service := range stage.Services {
-				fmt.Printf("    Service: %s\n", serviceName)
+				fmt.Printf("\n      💻 Service: %s\n", serviceName)
 				if service.Description != "" {
-					fmt.Printf("      Description: %s\n", service.Description)
+					fmt.Printf("         Description: %s\n", service.Description)
 				}
 
+				fmt.Println("         Commands:")
 				for i, command := range service.Commands {
-					fmt.Printf("      Command[%d]: %s\n", i+1, command)
+					// Truncate long commands for display
+					displayCmd := command
+					if len(displayCmd) > 60 {
+						displayCmd = displayCmd[:57] + "..."
+					}
+					fmt.Printf("         %d. %s\n", i+1, displayCmd)
 				}
 			}
 		}
-		fmt.Println()
 	}
 
-	// Show global settings
-	fmt.Println("Global Settings:")
-	fmt.Println("================")
+	// Show global settings with emoji
+	fmt.Println("\n⚙️  Global Settings:")
+	fmt.Println("==================")
 	fmt.Printf("Timeout: %d seconds\n", cfg.GlobalSettings.Timeout)
 	fmt.Printf("Retries: %d\n", cfg.GlobalSettings.Retries)
 	fmt.Printf("Auto Restart: %t\n", cfg.GlobalSettings.AutoRestart)
 }
 
-// configGenerateCmd generates .yaml holding config
+// configListCmd lists all available targets
+var configListCmd = &cobra.Command{
+	Use:   "list [config-file]",
+	Short: "List all available targets",
+	Long: `List all available targets in project.stage.service format.
+
+Examples:
+  hama-shell config list
+  hama-shell config list /path/to/config.yaml`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfgPath := getConfigPath(args)
+
+		// Load configuration
+		cfg, err := configServiceInstance.Load(cfgPath)
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		// Get and display targets
+		targets := configServiceInstance.List(cfg)
+		if len(targets) == 0 {
+			fmt.Println("No targets found in configuration")
+			return nil
+		}
+
+		fmt.Println("Available targets:")
+		for _, target := range targets {
+			// Resolve to get description if available
+			if svc, err := configServiceInstance.ResolveTarget(target, cfg); err == nil && svc.Description != "" {
+				fmt.Printf("  %s - %s\n", target, svc.Description)
+			} else {
+				fmt.Printf("  %s\n", target)
+			}
+		}
+		fmt.Printf("\nTotal: %d targets\n", len(targets))
+		return nil
+	},
+}
+
+// configGenerateCmd generates a configuration file interactively
 var configGenerateCmd = &cobra.Command{
-	Use:   "generate [config-file]",
-	Short: "Generate configuration file",
-	Long: `Generate the configuration file syntax and structure.
+	Use:   "generate [output-file]",
+	Short: "Generate configuration file interactively",
+	Long: `Generate a configuration file through an interactive wizard.
 
 Examples:
   hama-shell config generate
-  hama-shell config generate /path/to/config.yaml`,
+  hama-shell config generate ./my-config.yaml`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		var configFile string
+	RunE: func(cmd *cobra.Command, args []string) error {
+		outputPath := "hama-shell.yaml"
 		if len(args) > 0 {
-			configFile = args[0]
+			outputPath = args[0]
 		}
 
-		if configFile == "" {
-			fmt.Println("Generating default configuration...")
-		} else {
-			fmt.Printf("Generating configuration file: %s\n", configFile)
+		fmt.Println("🚀 HamaShell Configuration Generator")
+		fmt.Println("====================================")
+		fmt.Println()
+
+		// Create new config
+		cfg := &config.Config{
+			Projects:       make(map[string]config.Project),
+			GlobalSettings: config.GlobalSettings{
+				Timeout:     30,
+				Retries:     3,
+				AutoRestart: false,
+			},
 		}
 
-		// ToDo : Config 선언
-		//	 - 어떤 파일명으로 config.yaml 선언할 것인지?
-		//		Step 1: Configuration File Setup
-		//      "Let's start by setting up your configuration. What would you like to name your config.yaml file?"
-		//	 - 어떤 프로젝트?
-		//		Step 2: Project Selection
-		//      "Which project are you configuring? This helps organize your connections by project scope."
-		//	 - 어떤 서비스? (db, api-server, gitlab runner ,,,)
-		//		Step 3: Service Definition
-		//      "What type of service are you connecting to? (e.g., database, API server, GitLab runner, etc.)"
-		//	 - 어떤 스테이지? (dev, prod ,,)
-		//		Step 4: Environment Stage
-		//      "Which environment stage is this for? (e.g., development, production, staging, etc.)"
-		//	 - 어떤 명령어? (한 줄 한 줄 입력받되, 빈 줄 입력 시 명령어 입력 단계 종료)
-		//		Step 5: Commands Input
-		//      "Now let's define the commands for this connection. Enter each command on a separate line. When you're finished, press Enter on an empty line to continue."
-		//   - 입력한 명령어 최종 확인 (y -> yes 로 입력받아 다음 단계로 넘어감, n -> no 로 입력받아 명령어 다시 입력받게끔 처리)
-		//		Step 6: Commands Confirmation
-		//      "Please review your commands below. Type 'y' to confirm and proceed, or 'n' to edit them again."
-		// 	 - 글로벌 세팅 (재)설정
-		//		Step 7: Global Settings
-		//      "Finally, let's configure your global settings. These will apply across all your connections."
+		// Interactive configuration
+		reader := bufio.NewReader(os.Stdin)
+
+		// Add at least one project
+		for {
+			fmt.Print("\n📁 Enter project name (e.g., myapp): ")
+			projectName, _ := reader.ReadString('\n')
+			projectName = strings.TrimSpace(projectName)
+			if projectName == "" {
+				fmt.Println("Project name cannot be empty")
+				continue
+			}
+
+			fmt.Print("   Project description (optional): ")
+			projectDesc, _ := reader.ReadString('\n')
+			projectDesc = strings.TrimSpace(projectDesc)
+
+			project := config.Project{
+				Description: projectDesc,
+				Stages:      make(map[string]config.Stage),
+			}
+
+			// Add at least one stage
+			for {
+				fmt.Print("\n🔧 Enter stage name (e.g., dev, prod): ")
+				stageName, _ := reader.ReadString('\n')
+				stageName = strings.TrimSpace(stageName)
+				if stageName == "" {
+					fmt.Println("Stage name cannot be empty")
+					continue
+				}
+
+				fmt.Print("   Stage description (optional): ")
+				stageDesc, _ := reader.ReadString('\n')
+				stageDesc = strings.TrimSpace(stageDesc)
+
+				stage := config.Stage{
+					Description: stageDesc,
+					Services:    make(map[string]config.Service),
+				}
+
+				// Add at least one service
+				for {
+					fmt.Print("\n💻 Enter service name (e.g., api, database): ")
+					serviceName, _ := reader.ReadString('\n')
+					serviceName = strings.TrimSpace(serviceName)
+					if serviceName == "" {
+						fmt.Println("Service name cannot be empty")
+						continue
+					}
+
+					fmt.Print("   Service description (optional): ")
+					serviceDesc, _ := reader.ReadString('\n')
+					serviceDesc = strings.TrimSpace(serviceDesc)
+
+					// Add commands
+					fmt.Println("\n📝 Enter commands (one per line, empty line to finish):")
+					var commands []string
+					for {
+						fmt.Print("   > ")
+						command, _ := reader.ReadString('\n')
+						command = strings.TrimSpace(command)
+						if command == "" {
+							break
+						}
+						commands = append(commands, command)
+					}
+
+					if len(commands) == 0 {
+						fmt.Println("At least one command is required")
+						continue
+					}
+
+					service := config.Service{
+						Description: serviceDesc,
+						Commands:    commands,
+					}
+					stage.Services[serviceName] = service
+
+					// Ask if want to add more services
+					fmt.Print("\nAdd another service to this stage? (y/n): ")
+					answer, _ := reader.ReadString('\n')
+					if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(answer)), "y") {
+						break
+					}
+				}
+
+				project.Stages[stageName] = stage
+
+				// Ask if want to add more stages
+				fmt.Print("\nAdd another stage to this project? (y/n): ")
+				answer, _ := reader.ReadString('\n')
+				if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(answer)), "y") {
+					break
+				}
+			}
+
+			cfg.Projects[projectName] = project
+
+			// Ask if want to add more projects
+			fmt.Print("\nAdd another project? (y/n): ")
+			answer, _ := reader.ReadString('\n')
+			if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(answer)), "y") {
+				break
+			}
+		}
+
+		// Configure global settings
+		fmt.Println("\n⚙️  Global Settings Configuration")
+		fmt.Println("==================================")
+
+		fmt.Printf("Timeout in seconds (default 30): ")
+		timeoutStr, _ := reader.ReadString('\n')
+		timeoutStr = strings.TrimSpace(timeoutStr)
+		if timeoutStr != "" {
+			var timeout int
+			if _, err := fmt.Sscanf(timeoutStr, "%d", &timeout); err == nil && timeout > 0 {
+				cfg.GlobalSettings.Timeout = timeout
+			}
+		}
+
+		fmt.Printf("Number of retries (default 3): ")
+		retriesStr, _ := reader.ReadString('\n')
+		retriesStr = strings.TrimSpace(retriesStr)
+		if retriesStr != "" {
+			var retries int
+			if _, err := fmt.Sscanf(retriesStr, "%d", &retries); err == nil && retries >= 0 {
+				cfg.GlobalSettings.Retries = retries
+			}
+		}
+
+		fmt.Print("Enable auto-restart? (y/n, default n): ")
+		autoRestartStr, _ := reader.ReadString('\n')
+		cfg.GlobalSettings.AutoRestart = strings.HasPrefix(strings.ToLower(strings.TrimSpace(autoRestartStr)), "y")
+
+		// Write configuration to file
+		data, err := yaml.Marshal(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to marshal config: %w", err)
+		}
+
+		if err := os.WriteFile(outputPath, data, 0644); err != nil {
+			return fmt.Errorf("failed to write config file: %w", err)
+		}
+
+		fmt.Printf("\n✅ Configuration saved to: %s\n", outputPath)
+		fmt.Println("\nYou can now use:")
+		fmt.Printf("  hama-shell config validate %s\n", outputPath)
+		fmt.Printf("  hama-shell config show %s\n", outputPath)
+		fmt.Printf("  hama-shell start <target> --config %s\n", outputPath)
+
+		return nil
 	},
 }
 
@@ -239,10 +370,8 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 
 	// Add subcommands
-	configCmd.AddCommand(configShowCmd)
 	configCmd.AddCommand(configValidateCmd)
+	configCmd.AddCommand(configShowCmd)
+	configCmd.AddCommand(configListCmd)
 	configCmd.AddCommand(configGenerateCmd)
-
-	// Flags
-	configShowCmd.Flags().BoolP("paths", "p", false, "Show configuration file paths")
 }
