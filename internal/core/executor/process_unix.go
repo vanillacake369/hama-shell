@@ -26,6 +26,17 @@ func (m *unixProcessManager) setupCommand(cmd *exec.Cmd) {
 	}
 }
 
+// setupSupervisor configures supervisor with session/PGID settings
+func (m *unixProcessManager) setupSupervisor(cmd *exec.Cmd) error {
+	// Create new session and process group for supervisor
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid:  true, // Create new session
+		Setpgid: true, // Create new process group
+		Pgid:    0,    // PGID = PID (become group leader)
+	}
+	return nil
+}
+
 // terminateProcess gracefully terminates a process on Unix
 func (m *unixProcessManager) terminateProcess(process *os.Process) error {
 	if process == nil {

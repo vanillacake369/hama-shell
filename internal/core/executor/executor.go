@@ -2,13 +2,30 @@ package executor
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"runtime"
-	"strings"
-	"sync"
 	"time"
 )
+
+// SupervisorManagerInterface defines the interface for supervisor management
+type SupervisorManagerInterface interface {
+	createSupervisor(key string, segments []CommandSegment) (*SessionGroup, error)
+}
+
+// SignalManagerInterface defines the interface for signal management  
+type SignalManagerInterface interface {
+	manageSupervisor(session *SessionGroup)
+	gracefulShutdown(session *SessionGroup, timeout time.Duration) error
+	shutdownAllSessions(timeout time.Duration) error
+}
+
+// SSHManagerInterface defines the interface for SSH management
+type SSHManagerInterface interface {
+	executeSSHWithPTY(sshCmd, password string, remoteCmds []string) error
+}
+
+// CommandParserInterface defines the interface for command parsing
+type CommandParserInterface interface {
+	parseCommandSegments(commands []string) []CommandSegment
+}
 
 // Executor defines the interface for process execution and management
 type Executor interface {
@@ -34,17 +51,25 @@ type ProcessInfo struct {
 	Key       string
 }
 
-// executor is the main implementation of the Executor interface
+// executor is the main implementation of the Executor interface using session/PGID architecture
 type executor struct {
-	registry sync.Map // key: string, value: []*ProcessCommand
-	mu       sync.RWMutex
-	manager  processManager
+	registry         *SessionRegistry
+	parser          CommandParserInterface
+	supervisorMgr   SupervisorManagerInterface
+	signalMgr       SignalManagerInterface
+	sshMgr          SSHManagerInterface
 }
 
 // New creates a new Executor instance
 func New() Executor {
+	registry := NewSessionRegistry()
+	
 	return &executor{
-		manager: newProcessManager(),
+		registry:        registry,
+		parser:          NewCommandParser(),
+		supervisorMgr:   NewSupervisorManager(),
+		signalMgr:       NewSignalManager(registry),
+		sshMgr:          NewSSHManager(),
 	}
 }
 
@@ -54,165 +79,76 @@ func (e *executor) RunSequence(key string, commands []string) error {
 		return fmt.Errorf("no commands provided")
 	}
 
-	// Join commands with && to run in single shell with proper state sharing
-	command := strings.Join(commands, " && ")
-	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", command)
-	} else {
-		cmd = exec.Command("sh", "-c", command)
+	// Check if session already exists
+	if e.registry.hasSession(key) {
+		return fmt.Errorf("session with key '%s' already exists", key)
 	}
 
-	// Platform-specific command setup
-	e.manager.setupCommand(cmd)
-
-	// Set user's console
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start command: %w", err)
+	// Parse commands into segments (SSH vs shell commands)
+	segments := e.parser.parseCommandSegments(commands)
+	if len(segments) == 0 {
+		return fmt.Errorf("no valid command segments found")
 	}
 
-	// Create process record
-	proc := &ProcessCommand{
-		Cmd:       command,
-		Process:   cmd.Process,
-		Key:       key,
-		StartTime: time.Now(),
+	// Create supervisor session with session/PGID setup
+	session, err := e.supervisorMgr.createSupervisor(key, segments)
+	if err != nil {
+		return fmt.Errorf("failed to create supervisor session: %w", err)
 	}
 
-	// Add to registry
-	e.addToRegistry(key, proc)
+	// Register session for management
+	if err := e.registry.registerSession(key, session); err != nil {
+		return fmt.Errorf("failed to register session: %w", err)
+	}
 
-	// Monitor process in background
-	go e.waitForProcess(key, proc, cmd)
+	// Start session management in background
+	go e.signalMgr.manageSupervisor(session)
 
 	return nil
 }
 
 // StopAll terminates all running processes
 func (e *executor) StopAll() error {
-	var errors []error
-
-	e.registry.Range(func(key, value interface{}) bool {
-		if err := e.StopByKey(key.(string)); err != nil {
-			errors = append(errors, fmt.Errorf("failed to stop processes for key %s: %w", key, err))
-		}
-		return true
-	})
-
-	if len(errors) > 0 {
-		return fmt.Errorf("failed to stop %d process groups", len(errors))
-	}
-
-	return nil
+	// Use signal manager to gracefully shutdown all sessions
+	return e.signalMgr.shutdownAllSessions(30 * time.Second)
 }
 
 // StopByKey terminates all processes associated with the given key
 func (e *executor) StopByKey(key string) error {
-	value, exists := e.registry.Load(key)
+	// Get session from registry
+	session, exists := e.registry.getSession(key)
 	if !exists {
-		return nil // No processes for this key
+		return nil // No session for this key
 	}
 
-	processes := value.([]*ProcessCommand)
-	var errors []error
-
-	for _, proc := range processes {
-		if proc.Process != nil {
-			if err := e.manager.terminateProcess(proc.Process); err != nil {
-				errors = append(errors, fmt.Errorf("failed to terminate PID %d: %w", proc.Process.Pid, err))
-			}
-		}
-	}
-
-	// Remove from registry
-	e.registry.Delete(key)
-
-	if len(errors) > 0 {
-		return fmt.Errorf("failed to terminate %d processes", len(errors))
-	}
-
-	return nil
+	// Use signal manager for graceful shutdown
+	err := e.signalMgr.gracefulShutdown(session, 30*time.Second)
+	
+	// Remove from registry regardless of shutdown result
+	e.registry.unregisterSession(key)
+	
+	return err
 }
 
 // GetStatus returns the current status of all processes
 func (e *executor) GetStatus() map[string][]*ProcessInfo {
 	status := make(map[string][]*ProcessInfo)
-
-	e.registry.Range(func(key, value interface{}) bool {
-		processes := value.([]*ProcessCommand)
-		infos := make([]*ProcessInfo, 0, len(processes))
-
-		for _, proc := range processes {
-			if proc.Process != nil {
-				info := &ProcessInfo{
-					Command:   proc.Cmd,
-					PID:       proc.Process.Pid,
-					StartTime: proc.StartTime.Unix(),
-					Key:       proc.Key,
-				}
-				infos = append(infos, info)
+	
+	// Get all active sessions
+	sessions := e.registry.getAllSessions()
+	
+	for key, session := range sessions {
+		if session.Supervisor != nil && session.Supervisor.Process != nil {
+			// Create ProcessInfo for the supervisor process
+			info := &ProcessInfo{
+				Command:   fmt.Sprintf("Session supervisor (%d segments)", len(session.Segments)),
+				PID:       session.Supervisor.Process.Pid,
+				StartTime: session.StartTime.Unix(),
+				Key:       key,
 			}
+			status[key] = []*ProcessInfo{info}
 		}
-
-		if len(infos) > 0 {
-			status[key.(string)] = infos
-		}
-
-		return true
-	})
-
+	}
+	
 	return status
-}
-
-// addToRegistry adds a process to the registry
-func (e *executor) addToRegistry(key string, proc *ProcessCommand) {
-	value, _ := e.registry.LoadOrStore(key, []*ProcessCommand{})
-
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	processes := value.([]*ProcessCommand)
-	processes = append(processes, proc)
-	e.registry.Store(key, processes)
-}
-
-// removeFromRegistry removes a specific process from the registry
-func (e *executor) removeFromRegistry(key string, pid int) {
-	value, exists := e.registry.Load(key)
-	if !exists {
-		return
-	}
-
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	processes := value.([]*ProcessCommand)
-	filtered := make([]*ProcessCommand, 0, len(processes))
-
-	for _, proc := range processes {
-		if proc.Process == nil || proc.Process.Pid != pid {
-			filtered = append(filtered, proc)
-		}
-	}
-
-	if len(filtered) > 0 {
-		e.registry.Store(key, filtered)
-	} else {
-		e.registry.Delete(key)
-	}
-}
-
-// waitForProcess monitors a process and cleans up when it exits
-func (e *executor) waitForProcess(key string, proc *ProcessCommand, cmd *exec.Cmd) {
-	// Wait for process to complete
-	cmd.Wait()
-
-	// Remove from registry
-	if proc.Process != nil {
-		e.removeFromRegistry(key, proc.Process.Pid)
-	}
 }

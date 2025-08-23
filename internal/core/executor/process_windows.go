@@ -25,6 +25,16 @@ func (m *windowsProcessManager) setupCommand(cmd *exec.Cmd) {
 	}
 }
 
+// setupSupervisor configures supervisor process settings for Windows
+func (m *windowsProcessManager) setupSupervisor(cmd *exec.Cmd) error {
+	// Windows has limited session/PGID support compared to Unix
+	// Use process groups for basic lifecycle management
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | syscall.CREATE_NEW_CONSOLE,
+	}
+	return nil
+}
+
 // terminateProcess terminates a process on Windows
 func (m *windowsProcessManager) terminateProcess(process *os.Process) error {
 	if process == nil {
