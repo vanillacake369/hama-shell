@@ -6,6 +6,28 @@ import (
 	"time"
 )
 
+// ExecutionMode defines how commands should be executed
+type ExecutionMode int
+
+const (
+	// ExecutionModeForeground runs commands interactively with I/O forwarding
+	ExecutionModeForeground ExecutionMode = iota
+	// ExecutionModeBackground runs commands detached in background
+	ExecutionModeBackground
+)
+
+// String returns the string representation of ExecutionMode
+func (e ExecutionMode) String() string {
+	switch e {
+	case ExecutionModeForeground:
+		return "foreground"
+	case ExecutionModeBackground:
+		return "background"
+	default:
+		return "unknown"
+	}
+}
+
 // ProcessCommand represents a running command with its metadata (legacy)
 type ProcessCommand struct {
 	Cmd       string
