@@ -46,7 +46,11 @@ func (e *SSHExecutor) ExecuteWithPTY() error {
 	if err != nil {
 		return fmt.Errorf("start pty: %w", err)
 	}
-	defer ptmx.Close()
+	defer func() {
+		if closeErr := ptmx.Close(); closeErr != nil && e.Debug {
+			e.debug("Error closing PTY: %v", closeErr)
+		}
+	}()
 
 	// Handle I/O in background
 	done := make(chan error, 1)
@@ -57,7 +61,11 @@ func (e *SSHExecutor) ExecuteWithPTY() error {
 	case err := <-done:
 		return err
 	case <-ctx.Done():
-		cmd.Process.Kill()
+		if cmd.Process != nil {
+			if killErr := cmd.Process.Kill(); killErr != nil && e.Debug {
+				e.debug("Error killing process: %v", killErr)
+			}
+		}
 		return fmt.Errorf("timeout after %v", e.Timeout)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPTYSSH(t *testing.T) {
+func TestSSHExecutorWithPTY(t *testing.T) {
 	// GIVEN
 	executor := NewSSHExecutor("127.0.0.1", "limjihoon", "1026")
 	executor.Commands = []string{
