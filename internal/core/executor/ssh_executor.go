@@ -70,6 +70,10 @@ func (e *SSHExecutor) ExecuteWithPTY() error {
 	}
 }
 
+// ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
+// ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
+// ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
+// ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
 // handlePTYSession manages the interactive PTY session
 func (e *SSHExecutor) handlePTYSession(ptmx *os.File, done chan<- error) {
 	buffer := make([]byte, 4096)
