@@ -76,90 +76,210 @@ func (e *SSHExecutor) ExecuteWithPTY() error {
 	}
 }
 
-// ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
-// ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
-// ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
-// ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
-// handlePTYSession manages the interactive PTY session
+// sessionState manages the state of an interactive PTY session
+type sessionState struct {
+	ptySession     *os.File
+	buffer         []byte
+	output         string
+	passwordSent   bool
+	commandIndex   int
+	lastPromptTime time.Time
+	done           chan<- error
+}
+
+// newSessionState creates a new session state with sensible defaults
+func newSessionState(ptySession *os.File, done chan<- error) *sessionState {
+	return &sessionState{
+		ptySession:     ptySession,
+		buffer:         make([]byte, 4096),
+		output:         "",
+		passwordSent:   false,
+		commandIndex:   0,
+		lastPromptTime: time.Now(),
+		done:           done,
+	}
+}
+
+// handlePTYSession orchestrates the PTY session lifecycle
 func (e *SSHExecutor) handlePTYSession(ptySession *os.File, done chan<- error) {
-	buffer := make([]byte, 4096)
-	accumulated := ""
-
-	passwordSent := false
-	commandIndex := 0
-	lastPromptTime := time.Now()
-
+	state := newSessionState(ptySession, done)
+	
 	for {
-		// Read available data (non-blocking with timeout)
-		n, err := ptySession.Read(buffer)
-		if err != nil {
-			if err == io.EOF {
-				done <- nil
-			} else {
-				done <- fmt.Errorf("read pty: %w", err)
-			}
-			return
+		if !e.readAndProcessOutput(state) {
+			return // Session ended
 		}
+		
+		e.preventBufferOverflow(state)
+	}
+}
 
-		// Accumulate output
-		chunk := string(buffer[:n])
-		accumulated += chunk
+// readAndProcessOutput reads data from PTY and processes it based on current state
+func (e *SSHExecutor) readAndProcessOutput(state *sessionState) bool {
+	chunk, err := e.readChunkFromPTY(state)
+	if err != nil {
+		e.handleReadError(state, err)
+		return false
+	}
+	
+	state.output += chunk
+	e.echoToConsole(chunk)
+	
+	return e.processSessionOutput(state)
+}
 
-		// Echo output to console
-		fmt.Print(chunk)
+// readChunkFromPTY reads a chunk of data from the PTY session
+func (e *SSHExecutor) readChunkFromPTY(state *sessionState) (string, error) {
+	n, err := state.ptySession.Read(state.buffer)
+	if err != nil {
+		return "", err
+	}
+	return string(state.buffer[:n]), nil
+}
 
-		// Handle password prompt
-		if !passwordSent && strings.Contains(strings.ToLower(accumulated), "password:") {
-			time.Sleep(100 * time.Millisecond) // Small delay
-			_, err := ptySession.Write([]byte(e.Password + "\n"))
-			if err != nil {
-				done <- fmt.Errorf("write password: %w", err)
-				return
-			}
-			passwordSent = true
-			accumulated = "" // Clear buffer after password
-			lastPromptTime = time.Now()
-			continue
+// handleReadError processes read errors and signals completion
+func (e *SSHExecutor) handleReadError(state *sessionState, err error) {
+	if err == io.EOF {
+		state.done <- nil
+	} else {
+		state.done <- fmt.Errorf("read pty: %w", err)
+	}
+}
+
+// echoToConsole displays output to the user's console
+func (e *SSHExecutor) echoToConsole(chunk string) {
+	fmt.Print(chunk)
+}
+
+// processSessionOutput determines next action based on accumulated output
+func (e *SSHExecutor) processSessionOutput(state *sessionState) bool {
+	if e.shouldHandlePasswordPrompt(state) {
+		return e.handlePasswordPrompt(state)
+	}
+	
+	if e.shouldHandleShellPrompt(state) {
+		return e.handleShellPrompt(state)
+	}
+	
+	return true // Continue session
+}
+
+// shouldHandlePasswordPrompt checks if we need to send password
+func (e *SSHExecutor) shouldHandlePasswordPrompt(state *sessionState) bool {
+	return !state.passwordSent && e.containsPasswordPrompt(state.output)
+}
+
+// containsPasswordPrompt detects password prompt in output
+func (e *SSHExecutor) containsPasswordPrompt(output string) bool {
+	return strings.Contains(strings.ToLower(output), "password:")
+}
+
+// handlePasswordPrompt sends the password and updates session state
+func (e *SSHExecutor) handlePasswordPrompt(state *sessionState) bool {
+	time.Sleep(100 * time.Millisecond) // Brief delay for stability
+	
+	if err := e.writeToSession(state, e.Password); err != nil {
+		state.done <- fmt.Errorf("write password: %w", err)
+		return false
+	}
+	
+	e.updateStateAfterPassword(state)
+	return true
+}
+
+// updateStateAfterPassword cleans state after successful password entry
+func (e *SSHExecutor) updateStateAfterPassword(state *sessionState) {
+	state.passwordSent = true
+	state.output = ""
+	state.lastPromptTime = time.Now()
+}
+
+// shouldHandleShellPrompt checks if we should process shell commands
+func (e *SSHExecutor) shouldHandleShellPrompt(state *sessionState) bool {
+	return state.passwordSent && 
+		   e.hasShellPrompt(state.output) && 
+		   e.hasEnoughTimePassed(state)
+}
+
+// hasShellPrompt detects common shell prompt patterns
+func (e *SSHExecutor) hasShellPrompt(output string) bool {
+	promptPatterns := []string{"$", "#", ">", "bash-"}
+	
+	for _, pattern := range promptPatterns {
+		if strings.Contains(output, pattern) {
+			return true
 		}
+	}
+	return false
+}
 
-		// Handle shell prompt (look for common prompt patterns)
-		// Check for prompt patterns: $, #, >, or bash-X.X$
-		hasPrompt := strings.Contains(accumulated, "$") ||
-			strings.Contains(accumulated, "#") ||
-			strings.Contains(accumulated, ">") ||
-			strings.Contains(accumulated, "bash-")
+// hasEnoughTimePassed ensures sufficient delay between prompt detection and action
+func (e *SSHExecutor) hasEnoughTimePassed(state *sessionState) bool {
+	return time.Since(state.lastPromptTime) > 100*time.Millisecond
+}
 
-		// Only process if we have a prompt and sufficient time has passed
-		if passwordSent && hasPrompt && time.Since(lastPromptTime) > 100*time.Millisecond {
-			// Clear accumulated buffer when we detect a prompt
-			accumulated = ""
-			lastPromptTime = time.Now()
+// handleShellPrompt processes shell prompt and executes next command or exits
+func (e *SSHExecutor) handleShellPrompt(state *sessionState) bool {
+	e.clearOutputAndResetTimer(state)
+	
+	if e.hasMoreCommands(state) {
+		return e.executeNextCommand(state)
+	}
+	
+	return e.exitSession(state)
+}
 
-			if commandIndex < len(e.Commands) {
-				time.Sleep(100 * time.Millisecond) // Small delay before sending command
-				_, err := ptySession.Write([]byte(e.Commands[commandIndex] + "\n"))
-				if err != nil {
-					done <- fmt.Errorf("write command: %w", err)
-					return
-				}
-				commandIndex++
-			} else {
-				time.Sleep(200 * time.Millisecond) // Small delay before exit
-				_, err := ptySession.Write([]byte("exit\n"))
-				if err != nil {
-					done <- fmt.Errorf("write exit: %w", err)
-					return
-				}
-				// Wait a bit for the connection to close cleanly
-				time.Sleep(500 * time.Millisecond)
-				done <- nil
-				return
-			}
-		}
+// clearOutputAndResetTimer cleans accumulated output and resets timing
+func (e *SSHExecutor) clearOutputAndResetTimer(state *sessionState) {
+	state.output = ""
+	state.lastPromptTime = time.Now()
+}
 
-		// Prevent accumulated buffer from growing too large
-		if len(accumulated) > 8192 {
-			accumulated = accumulated[4096:]
-		}
+// hasMoreCommands checks if there are remaining commands to execute
+func (e *SSHExecutor) hasMoreCommands(state *sessionState) bool {
+	return state.commandIndex < len(e.Commands)
+}
+
+// executeNextCommand sends the next command in the sequence
+func (e *SSHExecutor) executeNextCommand(state *sessionState) bool {
+	time.Sleep(100 * time.Millisecond) // Brief delay for stability
+	
+	command := e.Commands[state.commandIndex]
+	if err := e.writeToSession(state, command); err != nil {
+		state.done <- fmt.Errorf("write command: %w", err)
+		return false
+	}
+	
+	state.commandIndex++
+	return true
+}
+
+// exitSession cleanly closes the SSH session
+func (e *SSHExecutor) exitSession(state *sessionState) bool {
+	time.Sleep(200 * time.Millisecond) // Brief delay before exit
+	
+	if err := e.writeToSession(state, "exit"); err != nil {
+		state.done <- fmt.Errorf("write exit: %w", err)
+		return false
+	}
+	
+	// Allow time for clean connection closure
+	time.Sleep(500 * time.Millisecond)
+	state.done <- nil
+	return false
+}
+
+// writeToSession sends a command or input to the PTY session
+func (e *SSHExecutor) writeToSession(state *sessionState, text string) error {
+	_, err := state.ptySession.Write([]byte(text + "\n"))
+	return err
+}
+
+// preventBufferOverflow manages memory usage by trimming large output buffers
+func (e *SSHExecutor) preventBufferOverflow(state *sessionState) {
+	const maxBufferSize = 8192
+	const trimSize = 4096
+	
+	if len(state.output) > maxBufferSize {
+		state.output = state.output[trimSize:]
 	}
 }
