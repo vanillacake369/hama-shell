@@ -19,17 +19,15 @@ type SSHExecutor struct {
 	Password string
 	Commands []string
 	Timeout  time.Duration
-	Debug    bool
 }
 
 // NewSSHExecutor creates a new SSH executor with defaults
-func NewSSHExecutor(host, user, password string) *SSHExecutor {
+func NewSSHExecutor(host, user, password string, timeout time.Duration) *SSHExecutor {
 	return &SSHExecutor{
 		Host:     host,
 		User:     user,
 		Password: password,
-		Timeout:  30 * time.Second,
-		Debug:    false,
+		Timeout:  timeout,
 	}
 }
 
@@ -38,23 +36,30 @@ func (e *SSHExecutor) ExecuteWithPTY() error {
 	ctx, cancel := context.WithTimeout(context.Background(), e.Timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ssh", "-tt",
+	// Start pty
+	cmd := exec.CommandContext(
+		ctx,
+		"ssh",
+		"-tt",
 		fmt.Sprintf("%s@%s", e.User, e.Host),
-		"bash", "--norc", "-i")
-
-	ptmx, err := pty.Start(cmd)
+		"bash",
+		"--norc",
+		"-i",
+	)
+	ptySession, err := pty.Start(cmd)
 	if err != nil {
 		return fmt.Errorf("start pty: %w", err)
 	}
 	defer func() {
-		if closeErr := ptmx.Close(); closeErr != nil && e.Debug {
-			e.debug("Error closing PTY: %v", closeErr)
+		closeErr := ptySession.Close()
+		if closeErr != nil {
+			panic(closeErr)
 		}
 	}()
 
 	// Handle I/O in background
 	done := make(chan error, 1)
-	go e.handlePTYSession(ptmx, done)
+	go e.handlePTYSession(ptySession, done)
 
 	// Wait for completion or timeout
 	select {
@@ -62,8 +67,9 @@ func (e *SSHExecutor) ExecuteWithPTY() error {
 		return err
 	case <-ctx.Done():
 		if cmd.Process != nil {
-			if killErr := cmd.Process.Kill(); killErr != nil && e.Debug {
-				e.debug("Error killing process: %v", killErr)
+			killErr := cmd.Process.Kill()
+			if killErr != nil {
+				return killErr
 			}
 		}
 		return fmt.Errorf("timeout after %v", e.Timeout)
@@ -75,7 +81,7 @@ func (e *SSHExecutor) ExecuteWithPTY() error {
 // ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
 // ToDo : 이제 이걸 1) 개선하고 2) executor 에 merge 하는 일만 남았다!!
 // handlePTYSession manages the interactive PTY session
-func (e *SSHExecutor) handlePTYSession(ptmx *os.File, done chan<- error) {
+func (e *SSHExecutor) handlePTYSession(ptySession *os.File, done chan<- error) {
 	buffer := make([]byte, 4096)
 	accumulated := ""
 
@@ -85,7 +91,7 @@ func (e *SSHExecutor) handlePTYSession(ptmx *os.File, done chan<- error) {
 
 	for {
 		// Read available data (non-blocking with timeout)
-		n, err := ptmx.Read(buffer)
+		n, err := ptySession.Read(buffer)
 		if err != nil {
 			if err == io.EOF {
 				done <- nil
@@ -102,14 +108,10 @@ func (e *SSHExecutor) handlePTYSession(ptmx *os.File, done chan<- error) {
 		// Echo output to console
 		fmt.Print(chunk)
 
-		// Debug output for troubleshooting
-		e.debug("Read %d bytes, accumulated length: %d", n, len(accumulated))
-
 		// Handle password prompt
 		if !passwordSent && strings.Contains(strings.ToLower(accumulated), "password:") {
-			e.debug("Password prompt detected, sending password")
 			time.Sleep(100 * time.Millisecond) // Small delay
-			_, err := ptmx.Write([]byte(e.Password + "\n"))
+			_, err := ptySession.Write([]byte(e.Password + "\n"))
 			if err != nil {
 				done <- fmt.Errorf("write password: %w", err)
 				return
@@ -134,18 +136,16 @@ func (e *SSHExecutor) handlePTYSession(ptmx *os.File, done chan<- error) {
 			lastPromptTime = time.Now()
 
 			if commandIndex < len(e.Commands) {
-				e.debug("Prompt detected, sending command %d: %s", commandIndex+1, e.Commands[commandIndex])
 				time.Sleep(100 * time.Millisecond) // Small delay before sending command
-				_, err := ptmx.Write([]byte(e.Commands[commandIndex] + "\n"))
+				_, err := ptySession.Write([]byte(e.Commands[commandIndex] + "\n"))
 				if err != nil {
 					done <- fmt.Errorf("write command: %w", err)
 					return
 				}
 				commandIndex++
 			} else {
-				e.debug("All commands executed, sending exit")
 				time.Sleep(200 * time.Millisecond) // Small delay before exit
-				_, err := ptmx.Write([]byte("exit\n"))
+				_, err := ptySession.Write([]byte("exit\n"))
 				if err != nil {
 					done <- fmt.Errorf("write exit: %w", err)
 					return
@@ -161,12 +161,5 @@ func (e *SSHExecutor) handlePTYSession(ptmx *os.File, done chan<- error) {
 		if len(accumulated) > 8192 {
 			accumulated = accumulated[4096:]
 		}
-	}
-}
-
-// debug prints debug messages if debug mode is enabled
-func (e *SSHExecutor) debug(format string, args ...interface{}) {
-	if e.Debug {
-		fmt.Printf("[DEBUG] "+format+"\n", args...)
 	}
 }

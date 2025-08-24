@@ -9,7 +9,7 @@ import (
 
 func TestSSHExecutorWithPTY(t *testing.T) {
 	// GIVEN
-	executor := NewSSHExecutor("127.0.0.1", "limjihoon", "1026")
+	executor := NewSSHExecutor("127.0.0.1", "limjihoon", "1026", 3*time.Second)
 	executor.Commands = []string{
 		"whoami",
 		"pwd",
@@ -19,7 +19,6 @@ func TestSSHExecutorWithPTY(t *testing.T) {
 		"ls | head -5",
 		"echo 'All commands completed'",
 	}
-	executor.Debug = true
 	executor.Timeout = 10 * time.Second
 
 	// WHEN
