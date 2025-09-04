@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"hama-shell/internal/core/config"
 	"hama-shell/types"
 	"os"
 	"strings"
@@ -41,7 +42,100 @@ Interactive mode:
 
 You can also provide command details via flags for non-interactive mode.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// ToDo : config add
+		manager := config.GetInstance()
+
+		// Load existing configuration
+		if err := manager.Load(); err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		reader := bufio.NewReader(os.Stdin)
+
+		fmt.Println("Add to existing configuration")
+		fmt.Println("==============================")
+
+		// Show existing projects
+		existingConfig := manager.GetConfig()
+		if existingConfig != nil && len(existingConfig.Projects) > 0 {
+			fmt.Println("\nExisting projects:")
+			for _, p := range existingConfig.Projects {
+				fmt.Printf("  - %s\n", p.Name)
+			}
+		}
+
+		// Get project name
+		fmt.Print("\nEnter project name (or new project name): ")
+		projectName, _ := reader.ReadString('\n')
+		projectName = strings.TrimSpace(projectName)
+
+		// Check if project exists
+		var projectExists bool
+		if existingConfig != nil {
+			for _, p := range existingConfig.Projects {
+				if p.Name == projectName {
+					projectExists = true
+					fmt.Printf("Adding service to existing project '%s'\n", projectName)
+					break
+				}
+			}
+		}
+
+		if !projectExists {
+			fmt.Printf("Creating new project '%s'\n", projectName)
+		}
+
+		// Get service name
+		fmt.Print("Enter service name: ")
+		serviceName, _ := reader.ReadString('\n')
+		serviceName = strings.TrimSpace(serviceName)
+
+		// Get commands
+		fmt.Println("Enter commands (one per line, empty line to finish):")
+		var commands []string
+		for {
+			fmt.Print("> ")
+			command, _ := reader.ReadString('\n')
+			command = strings.TrimSpace(command)
+			if command == "" {
+				break
+			}
+			commands = append(commands, command)
+		}
+
+		// Add to configuration
+		if projectExists {
+			// Add service to existing project
+			service := types.Service{
+				Name:     serviceName,
+				Commands: commands,
+			}
+			if err := manager.AddService(projectName, service); err != nil {
+				return err
+			}
+		} else {
+			// Create new project with service
+			project := types.Project{
+				Name: projectName,
+				Services: []types.Service{
+					{
+						Name:     serviceName,
+						Commands: commands,
+					},
+				},
+			}
+			if err := manager.AddProject(project); err != nil {
+				return err
+			}
+		}
+
+		// Save configuration
+		if err := manager.Save(); err != nil {
+			return fmt.Errorf("failed to save configuration: %w", err)
+		}
+
+		fmt.Printf("\nConfiguration updated successfully!\n")
+		fmt.Printf("File saved at: %s\n", manager.GetFilePath())
+
 		return nil
 	},
 }
