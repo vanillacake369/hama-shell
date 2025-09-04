@@ -1,42 +1,64 @@
+/*
+Copyright © 2025 NAME HERE <EMAIL ADDRESS>
+
+*/
 package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os"
 
-	"hama-shell/internal/core/config"
+	"github.com/spf13/cobra"
 )
 
-// AppConfig holds the parsed and validated configuration
-var AppConfig *config.Config
 
-// configFile holds the path to the configuration file
-var configFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "hama-shell",
-	Short: "A session and connection manager for developers",
-	Long: `HamaShell is a session and connection manager designed for developers who need reliable, secure access to various hosts in single CLI command.
+	Use:   "hs",
+	Short: "Hama Shell - Session management tool",
+	Long: `Hama Shell (hs) is a powerful session management tool that helps you
+manage long-running processes, attach/detach from sessions,
+and maintain command configurations.
 
-It simplifies complex multi-step SSH tunneling and session setup by letting developers define their connections declaratively in a YAML file.
-
-Key Features:
-- Declarative YAML-based configuration
-- Multi-step SSH tunneling and port forwarding
-- Terminal multiplexer integration (tmux, zellij, screen)
-- Session state management and persistence
-- Cross-platform support`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// This forces initConfig to run
-		fmt.Println("Root command executed - config should be loaded")
-	},
+Examples:
+  hs ls                    # List all sessions
+  hs web-server status     # Check status of web-server session
+  hs web-server attach     # Attach to web-server session
+  hs config add           # Add new command to configuration`,
+	// SilenceUsage prevents usage from being printed on every error
+	SilenceUsage: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Handle dynamic session commands before executing
+	args := os.Args[1:]
+	if len(args) > 0 {
+		// Check if the first argument might be a session ID
+		firstArg := args[0]
+		
+		// Skip if it's a known command
+		knownCommands := []string{"list", "ls", "config", "help", "completion", "--help", "-h", "--version", "-v"}
+		isKnownCommand := false
+		for _, cmd := range knownCommands {
+			if firstArg == cmd {
+				isKnownCommand = true
+				break
+			}
+		}
+		
+		// If it's not a known command, treat it as a session ID
+		if !isKnownCommand {
+			if err := handleDynamicSession(rootCmd, args); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+	}
+	
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
@@ -44,50 +66,15 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
+	// Here you will define your flags and configuration settings.
+	// Cobra supports persistent flags, which, if defined here,
+	// will be global for your application.
 
-	// Add config file flag
-	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "config file (default is $HOME/hama-shell.yaml or ./hama-shell.yaml)")
+	rootCmd.PersistentFlags().StringP("config", "c", "", "config file path (default is $HOME/.hama-shell.yaml)")
+
+	// Cobra also supports local flags, which will only run
+	// when this action is called directly.
+	rootCmd.Flags().BoolP("version", "v", false, "Show version information")
 }
 
-// initConfig reads in config file and ENV variables if set.
-func initConfig() {
-	// Only load config if it's actually needed
-	// Config commands, help commands, and bare command should work without config
-	if len(os.Args) > 1 {
-		// Skip config loading for config-related commands
-		if os.Args[1] == "config" || os.Args[1] == "help" || os.Args[1] == "--help" || os.Args[1] == "-h" {
-			return
-		}
-	} else {
-		// No arguments - just show help, don't require config
-		return
-	}
 
-	// Create validator and parse config
-	validator := config.NewValidator()
-
-	// Try to parse and validate config
-	var err error
-	AppConfig, err = validator.ParseAndValidate(configFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Configuration error: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Please check your configuration file or run 'hama-shell config generate' to create one.\n")
-		os.Exit(1)
-	}
-
-	// Also keep viper config for backward compatibility during transition
-	home, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to get user home directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	viper.AddConfigPath(home)
-	viper.AddConfigPath(".")
-	viper.SetConfigType("yaml")
-	viper.SetConfigName("hama-shell")
-
-	viper.AutomaticEnv()
-	_ = viper.ReadInConfig() // Ignore errors for now as we have static config
-}
