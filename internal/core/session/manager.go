@@ -1,7 +1,17 @@
-package types
+package session
 
 import (
 	"time"
+)
+
+// SessionStatus represents the current state of a session
+type SessionStatus string
+
+const (
+	StatusRunning SessionStatus = "running"
+	StatusStopped SessionStatus = "stopped"
+	StatusFailed  SessionStatus = "failed"
+	StatusPending SessionStatus = "pending"
 )
 
 // Session represents a managed process session
@@ -15,18 +25,8 @@ type Session struct {
 	TTYDevice string        `json:"tty_device,omitempty"`
 }
 
-// SessionStatus represents the current state of a session
-type SessionStatus string
-
-const (
-	StatusRunning SessionStatus = "running"
-	StatusStopped SessionStatus = "stopped"
-	StatusFailed  SessionStatus = "failed"
-	StatusPending SessionStatus = "pending"
-)
-
-// SessionManager interface for managing sessions
-type SessionManager interface {
+// Manager interface for managing sessions
+type Manager interface {
 	// List returns all sessions
 	List() ([]Session, error)
 

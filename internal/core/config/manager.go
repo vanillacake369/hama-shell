@@ -2,16 +2,30 @@ package config
 
 import (
 	"fmt"
-	"hama-shell/types"
 	"os"
 	"sync"
 
 	"gopkg.in/yaml.v3"
 )
 
+// Service represents a service configuration with commands
+type Service struct {
+	Commands []string `yaml:"commands"`
+}
+
+// Project represents a project configuration with services
+type Project struct {
+	Services map[string]*Service `yaml:"services"`
+}
+
+// Config represents the main configuration structure
+type Config struct {
+	Projects map[string]*Project `yaml:"projects"`
+}
+
 // ConfigManager manages configuration with memory caching and file persistence
 type ConfigManager struct {
-	config   *types.Config
+	config   *Config
 	filePath string
 	mu       sync.RWMutex
 }
@@ -44,20 +58,20 @@ func (cm *ConfigManager) Load() error {
 
 	if err != nil {
 		// Initialize with empty config if file doesn't exist
-		cm.config = &types.Config{
-			Projects: make(map[string]*types.Project),
+		cm.config = &Config{
+			Projects: make(map[string]*Project),
 		}
 		return nil
 	}
 
-	var config types.Config
+	var config Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
 
 	// Initialize map if nil
 	if config.Projects == nil {
-		config.Projects = make(map[string]*types.Project)
+		config.Projects = make(map[string]*Project)
 	}
 
 	cm.config = &config
@@ -86,7 +100,7 @@ func (cm *ConfigManager) Save() error {
 }
 
 // GetConfig returns a copy of the current configuration
-func (cm *ConfigManager) GetConfig() *types.Config {
+func (cm *ConfigManager) GetConfig() *Config {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 
@@ -105,8 +119,8 @@ func (cm *ConfigManager) AddProject(projectName string) error {
 	defer cm.mu.Unlock()
 
 	if cm.config == nil {
-		cm.config = &types.Config{
-			Projects: make(map[string]*types.Project),
+		cm.config = &Config{
+			Projects: make(map[string]*Project),
 		}
 	}
 
@@ -115,8 +129,8 @@ func (cm *ConfigManager) AddProject(projectName string) error {
 		return fmt.Errorf("project '%s' already exists", projectName)
 	}
 
-	cm.config.Projects[projectName] = &types.Project{
-		Services: make(map[string]*types.Service),
+	cm.config.Projects[projectName] = &Project{
+		Services: make(map[string]*Service),
 	}
 	return nil
 }
@@ -136,7 +150,7 @@ func (cm *ConfigManager) AddService(projectName, serviceName string, commands []
 	}
 
 	if project.Services == nil {
-		project.Services = make(map[string]*types.Service)
+		project.Services = make(map[string]*Service)
 	}
 
 	// Check if service already exists
@@ -144,7 +158,7 @@ func (cm *ConfigManager) AddService(projectName, serviceName string, commands []
 		return fmt.Errorf("service '%s' already exists in project '%s'", serviceName, projectName)
 	}
 
-	project.Services[serviceName] = &types.Service{
+	project.Services[serviceName] = &Service{
 		Commands: commands,
 	}
 	return nil

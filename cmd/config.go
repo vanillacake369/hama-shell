@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"hama-shell/internal/core/config"
-	"hama-shell/types"
 	"os"
 	"strings"
 
@@ -194,11 +193,11 @@ func readCommands(reader *bufio.Reader) []string {
 }
 
 // checkServiceExists checks if a service exists in a project
-func checkServiceExists(config *types.Config, projectName, serviceName string) bool {
-	if config == nil {
+func checkServiceExists(cfg *config.Config, projectName, serviceName string) bool {
+	if cfg == nil {
 		return false
 	}
-	project, projectExists := config.Projects[projectName]
+	project, projectExists := cfg.Projects[projectName]
 	if !projectExists {
 		return false
 	}
@@ -207,11 +206,11 @@ func checkServiceExists(config *types.Config, projectName, serviceName string) b
 }
 
 // displayConfig displays the configuration in YAML format
-func displayConfig(config *types.Config) {
-	if config == nil {
+func displayConfig(cfg *config.Config) {
+	if cfg == nil {
 		return
 	}
-	data, err := yaml.Marshal(config)
+	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return
 	}

@@ -22,7 +22,7 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Implement actual session listing from session manager
 		// For now, showing example output
-		
+
 		sessions := []struct {
 			ID        string
 			Status    string
@@ -53,7 +53,7 @@ Examples:
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 		fmt.Fprintln(w, "SESSION ID\tSTATUS\tSTART TIME\tCOMMAND")
 		fmt.Fprintln(w, "----------\t------\t----------\t-------")
-		
+
 		for _, session := range sessions {
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 				session.ID,
@@ -62,9 +62,9 @@ Examples:
 				session.Command,
 			)
 		}
-		
+
 		w.Flush()
-		
+
 		// Show session count
 		fmt.Printf("\nTotal sessions: %d\n", len(sessions))
 	},
@@ -72,7 +72,7 @@ Examples:
 
 func init() {
 	rootCmd.AddCommand(listCmd)
-	
+
 	// Add flags specific to list command
 	listCmd.Flags().BoolP("all", "a", false, "Show all sessions including stopped ones")
 	listCmd.Flags().StringP("status", "s", "", "Filter by status (running/stopped/failed)")
