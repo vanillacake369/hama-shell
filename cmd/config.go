@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"hama-shell/internal/core/config"
+	"hama-shell/types"
 	"os"
 	"strings"
 
@@ -86,54 +87,17 @@ You can also provide command details via flags for non-interactive mode.`,
 		serviceName = strings.TrimSpace(serviceName)
 
 		// Check if service exists in the project
-		var serviceExists bool
-		if projectExists && existingConfig != nil {
-			if project, ok := existingConfig.Projects[projectName]; ok {
-				if _, exists := project.Services[serviceName]; exists {
-					serviceExists = true
-					fmt.Printf("Service '%s' already exists. Adding commands to it.\n", serviceName)
-				}
-			}
+		serviceExists := checkServiceExists(existingConfig, projectName, serviceName)
+		if serviceExists {
+			fmt.Printf("Service '%s' already exists. Adding commands to it.\n", serviceName)
 		}
 
 		// Get commands
-		fmt.Println("Enter commands (one per line, empty line to finish):")
-		var commands []string
-		for {
-			fmt.Print("> ")
-			command, _ := reader.ReadString('\n')
-			command = strings.TrimSpace(command)
-			if command == "" {
-				break
-			}
-			commands = append(commands, command)
-		}
+		commands := readCommands(reader)
 
 		// Add to configuration
-		if projectExists {
-			if serviceExists {
-				// Append commands to existing service
-				if err := manager.AppendToService(projectName, serviceName, commands); err != nil {
-					return err
-				}
-				fmt.Printf("Added %d commands to existing service '%s'\n", len(commands), serviceName)
-			} else {
-				// Add new service to existing project
-				if err := manager.AddService(projectName, serviceName, commands); err != nil {
-					return err
-				}
-				fmt.Printf("Created new service '%s' with %d commands\n", serviceName, len(commands))
-			}
-		} else {
-			// Create new project first
-			if err := manager.AddProject(projectName); err != nil {
-				return err
-			}
-			// Then add service to it
-			if err := manager.AddService(projectName, serviceName, commands); err != nil {
-				return err
-			}
-			fmt.Printf("Created new project '%s' with service '%s'\n", projectName, serviceName)
+		if err := processConfigUpdate(manager, projectName, serviceName, commands, projectExists, serviceExists); err != nil {
+			return err
 		}
 
 		// Save configuration
@@ -186,17 +150,7 @@ You can also provide command details via flags for non-interactive mode.`,
 		serviceName = strings.TrimSpace(serviceName)
 
 		// 3. Get commands
-		fmt.Println("Enter commands (one per line, empty line to finish):")
-		var commands []string
-		for {
-			fmt.Print("> ")
-			command, _ := reader.ReadString('\n')
-			command = strings.TrimSpace(command)
-			if command == "" {
-				break
-			}
-			commands = append(commands, command)
-		}
+		commands := readCommands(reader)
 
 		// Add project and service using ConfigManager
 		if err := manager.AddProject(projectName); err != nil {
@@ -215,18 +169,85 @@ You can also provide command details via flags for non-interactive mode.`,
 		fmt.Printf("\nConfiguration file created at: %s\n", manager.GetFilePath())
 
 		// Display the generated configuration
-		currentConfig := manager.GetConfig()
-		if currentConfig != nil {
-			data, err := yaml.Marshal(currentConfig)
-			if err == nil {
-				fmt.Println("\nGenerated configuration:")
-				fmt.Println("------------------------")
-				fmt.Print(string(data))
-			}
-		}
+		displayConfig(manager.GetConfig())
 
 		return nil
 	},
+}
+
+// Helper functions
+
+// readCommands reads commands from user input until empty line
+func readCommands(reader *bufio.Reader) []string {
+	fmt.Println("Enter commands (one per line, empty line to finish):")
+	var commands []string
+	for {
+		fmt.Print("> ")
+		command, _ := reader.ReadString('\n')
+		command = strings.TrimSpace(command)
+		if command == "" {
+			break
+		}
+		commands = append(commands, command)
+	}
+	return commands
+}
+
+// checkServiceExists checks if a service exists in a project
+func checkServiceExists(config *types.Config, projectName, serviceName string) bool {
+	if config == nil {
+		return false
+	}
+	project, projectExists := config.Projects[projectName]
+	if !projectExists {
+		return false
+	}
+	_, serviceExists := project.Services[serviceName]
+	return serviceExists
+}
+
+// displayConfig displays the configuration in YAML format
+func displayConfig(config *types.Config) {
+	if config == nil {
+		return
+	}
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return
+	}
+	fmt.Println("\nGenerated configuration:")
+	fmt.Println("------------------------")
+	fmt.Print(string(data))
+}
+
+// processConfigUpdate handles adding/updating configuration based on existence
+func processConfigUpdate(manager *config.ConfigManager, projectName, serviceName string, commands []string, projectExists, serviceExists bool) error {
+	switch {
+	case !projectExists:
+		// Create new project and service
+		if err := manager.AddProject(projectName); err != nil {
+			return err
+		}
+		if err := manager.AddService(projectName, serviceName, commands); err != nil {
+			return err
+		}
+		fmt.Printf("Created new project '%s' with service '%s'\n", projectName, serviceName)
+
+	case serviceExists:
+		// Append to existing service
+		if err := manager.AppendToService(projectName, serviceName, commands); err != nil {
+			return err
+		}
+		fmt.Printf("Added %d commands to existing service '%s'\n", len(commands), serviceName)
+
+	default:
+		// Add new service to existing project
+		if err := manager.AddService(projectName, serviceName, commands); err != nil {
+			return err
+		}
+		fmt.Printf("Created new service '%s' with %d commands\n", serviceName, len(commands))
+	}
+	return nil
 }
 
 func init() {
