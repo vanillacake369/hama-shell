@@ -38,20 +38,26 @@ func (cm *ConfigManager) Load() error {
 	defer cm.mu.Unlock()
 
 	data, err := os.ReadFile(cm.filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Initialize with empty config if file doesn't exist
-			cm.config = &types.Config{
-				Projects: []types.Project{},
-			}
-			return nil
-		}
+	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	if err != nil {
+		// Initialize with empty config if file doesn't exist
+		cm.config = &types.Config{
+			Projects: make(map[string]*types.Project),
+		}
+		return nil
 	}
 
 	var config types.Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Initialize map if nil
+	if config.Projects == nil {
+		config.Projects = make(map[string]*types.Project)
 	}
 
 	cm.config = &config
@@ -94,29 +100,29 @@ func (cm *ConfigManager) GetConfig() *types.Config {
 }
 
 // AddProject adds a new project to the configuration
-func (cm *ConfigManager) AddProject(project types.Project) error {
+func (cm *ConfigManager) AddProject(projectName string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
 	if cm.config == nil {
 		cm.config = &types.Config{
-			Projects: []types.Project{},
+			Projects: make(map[string]*types.Project),
 		}
 	}
 
 	// Check if project already exists
-	for _, p := range cm.config.Projects {
-		if p.Name == project.Name {
-			return fmt.Errorf("project '%s' already exists", project.Name)
-		}
+	if _, exists := cm.config.Projects[projectName]; exists {
+		return fmt.Errorf("project '%s' already exists", projectName)
 	}
 
-	cm.config.Projects = append(cm.config.Projects, project)
+	cm.config.Projects[projectName] = &types.Project{
+		Services: make(map[string]*types.Service),
+	}
 	return nil
 }
 
 // AddService adds a service to an existing project
-func (cm *ConfigManager) AddService(projectName string, service types.Service) error {
+func (cm *ConfigManager) AddService(projectName, serviceName string, commands []string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -124,20 +130,48 @@ func (cm *ConfigManager) AddService(projectName string, service types.Service) e
 		return fmt.Errorf("configuration not loaded")
 	}
 
-	for i, p := range cm.config.Projects {
-		if p.Name == projectName {
-			// Check if service already exists
-			for _, s := range p.Services {
-				if s.Name == service.Name {
-					return fmt.Errorf("service '%s' already exists in project '%s'", service.Name, projectName)
-				}
-			}
-			cm.config.Projects[i].Services = append(p.Services, service)
-			return nil
-		}
+	project, exists := cm.config.Projects[projectName]
+	if !exists {
+		return fmt.Errorf("project '%s' not found", projectName)
 	}
 
-	return fmt.Errorf("project '%s' not found", projectName)
+	if project.Services == nil {
+		project.Services = make(map[string]*types.Service)
+	}
+
+	// Check if service already exists
+	if _, exists := project.Services[serviceName]; exists {
+		return fmt.Errorf("service '%s' already exists in project '%s'", serviceName, projectName)
+	}
+
+	project.Services[serviceName] = &types.Service{
+		Commands: commands,
+	}
+	return nil
+}
+
+// AppendToService appends commands to an existing service
+func (cm *ConfigManager) AppendToService(projectName, serviceName string, commands []string) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	if cm.config == nil {
+		return fmt.Errorf("configuration not loaded")
+	}
+
+	project, exists := cm.config.Projects[projectName]
+	if !exists {
+		return fmt.Errorf("project '%s' not found", projectName)
+	}
+
+	service, exists := project.Services[serviceName]
+	if !exists {
+		return fmt.Errorf("service '%s' not found in project '%s'", serviceName, projectName)
+	}
+
+	// Append new commands to existing ones
+	service.Commands = append(service.Commands, commands...)
+	return nil
 }
 
 // UpdateService updates an existing service
@@ -149,19 +183,18 @@ func (cm *ConfigManager) UpdateService(projectName, serviceName string, commands
 		return fmt.Errorf("configuration not loaded")
 	}
 
-	for i, p := range cm.config.Projects {
-		if p.Name == projectName {
-			for j, s := range p.Services {
-				if s.Name == serviceName {
-					cm.config.Projects[i].Services[j].Commands = commands
-					return nil
-				}
-			}
-			return fmt.Errorf("service '%s' not found in project '%s'", serviceName, projectName)
-		}
+	project, exists := cm.config.Projects[projectName]
+	if !exists {
+		return fmt.Errorf("project '%s' not found", projectName)
 	}
 
-	return fmt.Errorf("project '%s' not found", projectName)
+	service, exists := project.Services[serviceName]
+	if !exists {
+		return fmt.Errorf("service '%s' not found in project '%s'", serviceName, projectName)
+	}
+
+	service.Commands = commands
+	return nil
 }
 
 // DeleteProject removes a project from configuration
@@ -173,14 +206,12 @@ func (cm *ConfigManager) DeleteProject(projectName string) error {
 		return fmt.Errorf("configuration not loaded")
 	}
 
-	for i, p := range cm.config.Projects {
-		if p.Name == projectName {
-			cm.config.Projects = append(cm.config.Projects[:i], cm.config.Projects[i+1:]...)
-			return nil
-		}
+	if _, exists := cm.config.Projects[projectName]; !exists {
+		return fmt.Errorf("project '%s' not found", projectName)
 	}
 
-	return fmt.Errorf("project '%s' not found", projectName)
+	delete(cm.config.Projects, projectName)
+	return nil
 }
 
 // DeleteService removes a service from a project
@@ -192,19 +223,17 @@ func (cm *ConfigManager) DeleteService(projectName, serviceName string) error {
 		return fmt.Errorf("configuration not loaded")
 	}
 
-	for i, p := range cm.config.Projects {
-		if p.Name == projectName {
-			for j, s := range p.Services {
-				if s.Name == serviceName {
-					cm.config.Projects[i].Services = append(p.Services[:j], p.Services[j+1:]...)
-					return nil
-				}
-			}
-			return fmt.Errorf("service '%s' not found in project '%s'", serviceName, projectName)
-		}
+	project, exists := cm.config.Projects[projectName]
+	if !exists {
+		return fmt.Errorf("project '%s' not found", projectName)
 	}
 
-	return fmt.Errorf("project '%s' not found", projectName)
+	if _, exists := project.Services[serviceName]; !exists {
+		return fmt.Errorf("service '%s' not found in project '%s'", serviceName, projectName)
+	}
+
+	delete(project.Services, serviceName)
+	return nil
 }
 
 // FileExists checks if the configuration file exists

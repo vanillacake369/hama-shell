@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"hama-shell/internal/core/config"
-	"hama-shell/types"
 	"os"
 	"strings"
 
@@ -58,8 +57,8 @@ You can also provide command details via flags for non-interactive mode.`,
 		existingConfig := manager.GetConfig()
 		if existingConfig != nil && len(existingConfig.Projects) > 0 {
 			fmt.Println("\nExisting projects:")
-			for _, p := range existingConfig.Projects {
-				fmt.Printf("  - %s\n", p.Name)
+			for name := range existingConfig.Projects {
+				fmt.Printf("  - %s\n", name)
 			}
 		}
 
@@ -71,12 +70,9 @@ You can also provide command details via flags for non-interactive mode.`,
 		// Check if project exists
 		var projectExists bool
 		if existingConfig != nil {
-			for _, p := range existingConfig.Projects {
-				if p.Name == projectName {
-					projectExists = true
-					fmt.Printf("Adding service to existing project '%s'\n", projectName)
-					break
-				}
+			if _, exists := existingConfig.Projects[projectName]; exists {
+				projectExists = true
+				fmt.Printf("Adding service to existing project '%s'\n", projectName)
 			}
 		}
 
@@ -88,6 +84,17 @@ You can also provide command details via flags for non-interactive mode.`,
 		fmt.Print("Enter service name: ")
 		serviceName, _ := reader.ReadString('\n')
 		serviceName = strings.TrimSpace(serviceName)
+
+		// Check if service exists in the project
+		var serviceExists bool
+		if projectExists && existingConfig != nil {
+			if project, ok := existingConfig.Projects[projectName]; ok {
+				if _, exists := project.Services[serviceName]; exists {
+					serviceExists = true
+					fmt.Printf("Service '%s' already exists. Adding commands to it.\n", serviceName)
+				}
+			}
+		}
 
 		// Get commands
 		fmt.Println("Enter commands (one per line, empty line to finish):")
@@ -104,28 +111,29 @@ You can also provide command details via flags for non-interactive mode.`,
 
 		// Add to configuration
 		if projectExists {
-			// Add service to existing project
-			service := types.Service{
-				Name:     serviceName,
-				Commands: commands,
-			}
-			if err := manager.AddService(projectName, service); err != nil {
-				return err
+			if serviceExists {
+				// Append commands to existing service
+				if err := manager.AppendToService(projectName, serviceName, commands); err != nil {
+					return err
+				}
+				fmt.Printf("Added %d commands to existing service '%s'\n", len(commands), serviceName)
+			} else {
+				// Add new service to existing project
+				if err := manager.AddService(projectName, serviceName, commands); err != nil {
+					return err
+				}
+				fmt.Printf("Created new service '%s' with %d commands\n", serviceName, len(commands))
 			}
 		} else {
-			// Create new project with service
-			project := types.Project{
-				Name: projectName,
-				Services: []types.Service{
-					{
-						Name:     serviceName,
-						Commands: commands,
-					},
-				},
-			}
-			if err := manager.AddProject(project); err != nil {
+			// Create new project first
+			if err := manager.AddProject(projectName); err != nil {
 				return err
 			}
+			// Then add service to it
+			if err := manager.AddService(projectName, serviceName, commands); err != nil {
+				return err
+			}
+			fmt.Printf("Created new project '%s' with service '%s'\n", projectName, serviceName)
 		}
 
 		// Save configuration
@@ -148,15 +156,17 @@ var configCreateCmd = &cobra.Command{
 
 You can also provide command details via flags for non-interactive mode.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// home directory 의 설정 파일을 읽어옴
-		home := os.Getenv("HOME")
-		fileName := "hama-shell.yaml"
-		filePath := home + "/" + fileName
+		manager := config.GetInstance()
 
 		// Check if file already exists
-		if _, err := os.Stat(filePath); err == nil {
+		if manager.FileExists() {
 			fmt.Println("Configuration file already exists")
 			return nil
+		}
+
+		// Load configuration (will initialize empty config)
+		if err := manager.Load(); err != nil {
+			return fmt.Errorf("failed to initialize configuration: %w", err)
 		}
 
 		// 단계 별로 DTO 로 입력받아 file 저장
@@ -188,37 +198,33 @@ You can also provide command details via flags for non-interactive mode.`,
 			commands = append(commands, command)
 		}
 
-		// Create configuration object
-		config := types.Config{
-			Projects: []types.Project{
-				{
-					Name: projectName,
-					Services: []types.Service{
-						{
-							Name:     serviceName,
-							Commands: commands,
-						},
-					},
-				},
-			},
+		// Add project and service using ConfigManager
+		if err := manager.AddProject(projectName); err != nil {
+			return fmt.Errorf("failed to add project: %w", err)
 		}
 
-		// Convert to YAML
-		data, err := yaml.Marshal(&config)
-		if err != nil {
-			return fmt.Errorf("failed to marshal configuration: %w", err)
+		if err := manager.AddService(projectName, serviceName, commands); err != nil {
+			return fmt.Errorf("failed to add service: %w", err)
 		}
 
-		// Write the configuration file
-		err = os.WriteFile(filePath, data, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to create configuration file: %w", err)
+		// Save configuration
+		if err := manager.Save(); err != nil {
+			return fmt.Errorf("failed to save configuration: %w", err)
 		}
 
-		fmt.Printf("\nConfiguration file created at: %s\n", filePath)
-		fmt.Println("\nGenerated configuration:")
-		fmt.Println("------------------------")
-		fmt.Print(string(data))
+		fmt.Printf("\nConfiguration file created at: %s\n", manager.GetFilePath())
+
+		// Display the generated configuration
+		currentConfig := manager.GetConfig()
+		if currentConfig != nil {
+			data, err := yaml.Marshal(currentConfig)
+			if err == nil {
+				fmt.Println("\nGenerated configuration:")
+				fmt.Println("------------------------")
+				fmt.Print(string(data))
+			}
+		}
+
 		return nil
 	},
 }
