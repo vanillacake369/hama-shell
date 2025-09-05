@@ -1,17 +1,15 @@
 /*
 Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/spf13/cobra"
 )
-
-
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -38,17 +36,11 @@ func Execute() {
 	if len(args) > 0 {
 		// Check if the first argument might be a session ID
 		firstArg := args[0]
-		
+
 		// Skip if it's a known command
 		knownCommands := []string{"list", "ls", "config", "help", "completion", "--help", "-h", "--version", "-v"}
-		isKnownCommand := false
-		for _, cmd := range knownCommands {
-			if firstArg == cmd {
-				isKnownCommand = true
-				break
-			}
-		}
-		
+		isKnownCommand := slices.Contains(knownCommands, firstArg)
+
 		// If it's not a known command, treat it as a session ID
 		if !isKnownCommand {
 			if err := handleDynamicSession(rootCmd, args); err != nil {
@@ -58,7 +50,7 @@ func Execute() {
 			return
 		}
 	}
-	
+
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
@@ -76,5 +68,3 @@ func init() {
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("version", "v", false, "Show version information")
 }
-
-

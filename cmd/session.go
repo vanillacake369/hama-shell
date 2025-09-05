@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -63,12 +64,7 @@ func sessionExists(sessionID string) bool {
 	// TODO: Implement actual session checking
 	// For now, return true for demo sessions
 	demoSessions := []string{"web-server", "db-backup", "worker-1"}
-	for _, id := range demoSessions {
-		if id == sessionID {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(demoSessions, sessionID)
 }
 
 // Helper function to get available sessions for completion

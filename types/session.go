@@ -55,5 +55,5 @@ type SessionManager interface {
 	Restart(id string) error
 
 	// Update updates session configuration
-	Update(id string, updates map[string]interface{}) error
+	Update(id string, updates map[string]any) error
 }
