@@ -18,13 +18,13 @@ var serviceCmd = &cobra.Command{
 
 // serviceStartCmd represents the service start command
 var serviceStartCmd = &cobra.Command{
-	Use:   "start <project>.<service>",
+	Use:   "start <project>.<service>.<stage>",
 	Short: "Start a service from configuration",
 	Long: `Start a service defined in the configuration file.
 
 Examples:
-  hama-shell service start myproject.database
-  hama-shell service start myproject.api`,
+  hama-shell service start myproject.database.dev
+  hama-shell service start myproject.api.prod`,
 	Args: cobra.ExactArgs(1),
 	Run:  runServiceStart,
 }
@@ -45,10 +45,10 @@ func init() {
 
 // runServiceStart starts a service using API layer
 func runServiceStart(_ *cobra.Command, args []string) {
-	// Parse project.service format
+	// Parse project.service.stage format
 	parts := strings.Split(args[0], ".")
-	if len(parts) != 2 {
-		log.Fatalf("Invalid service format. Use: <project>.<service>")
+	if len(parts) != 3 {
+		log.Fatalf("Invalid service format. Use: <project>.<service>.<stage>")
 	}
 
 	// Create service API
@@ -56,7 +56,7 @@ func runServiceStart(_ *cobra.Command, args []string) {
 	defer serviceAPI.Shutdown()
 
 	// Start service through API layer
-	if err := serviceAPI.StartService(parts[0], parts[1]); err != nil {
+	if err := serviceAPI.StartService(parts[0], parts[1], parts[2]); err != nil {
 		log.Fatalf("Failed to start service: %v", err)
 	}
 }

@@ -48,8 +48,12 @@ func (cm *ConfigManagerWrapper) CreateConfig(op model.ConfigOperation) error {
 		return fmt.Errorf("failed to add project: %w", err)
 	}
 
-	if err := cm.manager.AddService(op.ProjectName, op.ServiceName, op.Commands); err != nil {
+	if err := cm.manager.AddService(op.ProjectName, op.ServiceName); err != nil {
 		return fmt.Errorf("failed to add service: %w", err)
+	}
+
+	if err := cm.manager.AddStage(op.ProjectName, op.ServiceName, op.StageName, op.Commands); err != nil {
+		return fmt.Errorf("failed to add stage: %w", err)
 	}
 
 	// Save configuration
@@ -63,41 +67,49 @@ func (cm *ConfigManagerWrapper) CreateConfig(op model.ConfigOperation) error {
 // AddToConfig adds a service or updates existing configuration
 func (cm *ConfigManagerWrapper) AddToConfig(op model.ConfigOperation) error {
 	cfg := cm.manager.GetConfig()
-	
-	// Check if project exists
+
+	// Check if project, service, and stage exist
 	projectExists := false
 	serviceExists := false
-	
+	stageExists := false
+
 	if cfg != nil {
 		if project, exists := cfg.Projects[op.ProjectName]; exists {
 			projectExists = true
-			if _, exists := project.Services[op.ServiceName]; exists {
+			if service, exists := project.Services[op.ServiceName]; exists {
 				serviceExists = true
+				if _, exists := service.Stages[op.StageName]; exists {
+					stageExists = true
+				}
 			}
 		}
 	}
 
-	// Process based on existence
-	switch {
-	case !projectExists:
-		// Create new project and service
+	// Create missing components step by step
+	// 1. Create project if it doesn't exist
+	if !projectExists {
 		if err := cm.manager.AddProject(op.ProjectName); err != nil {
-			return err
+			return fmt.Errorf("failed to add project: %w", err)
 		}
-		if err := cm.manager.AddService(op.ProjectName, op.ServiceName, op.Commands); err != nil {
-			return err
-		}
+	}
 
-	case serviceExists:
-		// Append to existing service
-		if err := cm.manager.AppendToService(op.ProjectName, op.ServiceName, op.Commands); err != nil {
-			return err
+	// 2. Create service if it doesn't exist
+	if !serviceExists {
+		if err := cm.manager.AddService(op.ProjectName, op.ServiceName); err != nil {
+			return fmt.Errorf("failed to add service: %w", err)
 		}
+	}
 
-	default:
-		// Add new service to existing project
-		if err := cm.manager.AddService(op.ProjectName, op.ServiceName, op.Commands); err != nil {
-			return err
+	// 3. Handle stage creation/update
+	if stageExists {
+		// Stage exists - append to existing stage
+		if err := cm.manager.AppendToService(op.ProjectName, op.ServiceName, op.StageName, op.Commands); err != nil {
+			return fmt.Errorf("failed to append to existing stage: %w", err)
+		}
+	} else {
+		// Stage doesn't exist - add new stage
+		if err := cm.manager.AddStage(op.ProjectName, op.ServiceName, op.StageName, op.Commands); err != nil {
+			return fmt.Errorf("failed to add stage: %w", err)
 		}
 	}
 

@@ -82,6 +82,11 @@ func (api *ConfigAPI) CreateConfiguration() error {
 	serviceName, _ := api.reader.ReadString('\n')
 	serviceName = strings.TrimSpace(serviceName)
 
+	// Get stage name
+	fmt.Print("Enter stage name: ")
+	stageName, _ := api.reader.ReadString('\n')
+	stageName = strings.TrimSpace(stageName)
+
 	// Get commands
 	commands := api.readCommands()
 
@@ -89,6 +94,7 @@ func (api *ConfigAPI) CreateConfiguration() error {
 	op := model.ConfigOperation{
 		ProjectName: projectName,
 		ServiceName: serviceName,
+		StageName:   stageName,
 		Commands:    commands,
 	}
 
@@ -144,6 +150,11 @@ func (api *ConfigAPI) AddToConfiguration() error {
 	serviceName, _ := api.reader.ReadString('\n')
 	serviceName = strings.TrimSpace(serviceName)
 
+	// Get stage name
+	fmt.Print("Enter stage name: ")
+	stageName, _ := api.reader.ReadString('\n')
+	stageName = strings.TrimSpace(stageName)
+
 	// Get commands
 	commands := api.readCommands()
 
@@ -151,6 +162,7 @@ func (api *ConfigAPI) AddToConfiguration() error {
 	op := model.ConfigOperation{
 		ProjectName: projectName,
 		ServiceName: serviceName,
+		StageName:   stageName,
 		Commands:    commands,
 	}
 

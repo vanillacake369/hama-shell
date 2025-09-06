@@ -1,8 +1,13 @@
 package model
 
-// Service represents a service configuration with commands
-type Service struct {
+// Stage represents a stage configuration with commands
+type Stage struct {
 	Commands []string `yaml:"commands"`
+}
+
+// Service represents a service configuration with stages
+type Service struct {
+	Stages map[string]*Stage `yaml:"stages"`
 }
 
 // Project represents a project configuration with services
@@ -19,6 +24,7 @@ type Config struct {
 type ConfigOperation struct {
 	ProjectName string
 	ServiceName string
+	StageName   string
 	Commands    []string
 }
 

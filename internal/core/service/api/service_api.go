@@ -9,8 +9,8 @@ import (
 
 // ServiceAPI provides high-level service operations
 type ServiceAPI struct {
-	configReader  *infra.ConfigReader
-	terminalMgr   *infra.TerminalManager
+	configReader *infra.ConfigReader
+	terminalMgr  *infra.TerminalManager
 }
 
 // NewServiceAPI creates a new ServiceAPI instance
@@ -21,12 +21,12 @@ func NewServiceAPI() *ServiceAPI {
 	}
 }
 
-// StartService starts a service by project and service name
-func (api *ServiceAPI) StartService(projectName, serviceName string) error {
+// StartService starts a service by project, service, and stage name
+func (api *ServiceAPI) StartService(projectName, serviceName, stageName string) error {
 	// Get service configuration
-	service, err := api.configReader.GetService(projectName, serviceName)
+	service, err := api.configReader.GetService(projectName, serviceName, stageName)
 	if err != nil {
-		return fmt.Errorf("failed to get service '%s.%s': %w", projectName, serviceName, err)
+		return fmt.Errorf("failed to get service '%s.%s.%s': %w", projectName, serviceName, stageName, err)
 	}
 
 	// Print service information
@@ -61,23 +61,30 @@ func (api *ServiceAPI) ListServices() error {
 	fmt.Println("Available services:")
 	fmt.Println()
 
-	// Group services by project
-	projectServices := make(map[string][]model.Service)
+	// Group services by project and service
+	projectServiceStages := make(map[string]map[string][]model.Service)
 	for _, service := range services {
-		projectServices[service.ProjectName] = append(projectServices[service.ProjectName], service)
+		if projectServiceStages[service.ProjectName] == nil {
+			projectServiceStages[service.ProjectName] = make(map[string][]model.Service)
+		}
+		projectServiceStages[service.ProjectName][service.ServiceName] = append(
+			projectServiceStages[service.ProjectName][service.ServiceName], service)
 	}
 
 	// Display grouped services
-	for projectName, projectSvcs := range projectServices {
+	for projectName, servicePairs := range projectServiceStages {
 		fmt.Printf("📁 Project: %s\n", projectName)
-		
-		if len(projectSvcs) == 0 {
+
+		if len(servicePairs) == 0 {
 			fmt.Println("  (no services defined)")
 		} else {
-			for _, service := range projectSvcs {
-				fmt.Printf("  🔧 %s\n", service.GetFullName())
-				for i, command := range service.Commands {
-					fmt.Printf("    [%d] %s\n", i+1, command)
+			for serviceName, stages := range servicePairs {
+				fmt.Printf("  🔧 Service: %s\n", serviceName)
+				for _, stage := range stages {
+					fmt.Printf("    📋 %s\n", stage.GetFullName())
+					for i, command := range stage.Commands {
+						fmt.Printf("      [%d] %s\n", i+1, command)
+					}
 				}
 			}
 		}
@@ -85,7 +92,7 @@ func (api *ServiceAPI) ListServices() error {
 	}
 
 	fmt.Println("Usage:")
-	fmt.Println("  hama-shell service start <project>.<service>")
+	fmt.Println("  hama-shell service start <project>.<service>.<stage>")
 	fmt.Printf("\nConfiguration file: %s\n", api.configReader.GetConfigFilePath())
 
 	return nil

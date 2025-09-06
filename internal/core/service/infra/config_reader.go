@@ -20,7 +20,7 @@ func NewConfigReader() *ConfigReader {
 }
 
 // GetService retrieves a specific service configuration
-func (c *ConfigReader) GetService(projectName, serviceName string) (*model.Service, error) {
+func (c *ConfigReader) GetService(projectName, serviceName, stageName string) (*model.Service, error) {
 	cfg := c.manager
 
 	// Find project
@@ -35,11 +35,18 @@ func (c *ConfigReader) GetService(projectName, serviceName string) (*model.Servi
 		return nil, model.ErrServiceNotFound
 	}
 
+	// Find stage
+	stageConfig, exists := serviceConfig.Stages[stageName]
+	if !exists {
+		return nil, model.ErrServiceNotFound
+	}
+
 	// Create service model
 	service := &model.Service{
 		ProjectName: projectName,
 		ServiceName: serviceName,
-		Commands:    serviceConfig.Commands,
+		StageName:   stageName,
+		Commands:    stageConfig.Commands,
 	}
 
 	// Validate service
@@ -57,12 +64,15 @@ func (c *ConfigReader) ListAllServices() ([]model.Service, error) {
 
 	for projectName, project := range cfg.Projects {
 		for serviceName, serviceConfig := range project.Services {
-			service := model.Service{
-				ProjectName: projectName,
-				ServiceName: serviceName,
-				Commands:    serviceConfig.Commands,
+			for stageName, stageConfig := range serviceConfig.Stages {
+				service := model.Service{
+					ProjectName: projectName,
+					ServiceName: serviceName,
+					StageName:   stageName,
+					Commands:    stageConfig.Commands,
+				}
+				services = append(services, service)
 			}
-			services = append(services, service)
 		}
 	}
 

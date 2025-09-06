@@ -28,10 +28,13 @@ type ConfigManager interface {
 	AddProject(projectName string) error
 
 	// AddService adds a service to an existing project
-	AddService(projectName, serviceName string, commands []string) error
+	AddService(projectName, serviceName string) error
 
-	// AppendToService appends commands to an existing service
-	AppendToService(projectName, serviceName string, commands []string) error
+	// AddStage adds a stage to an existing service
+	AddStage(projectName, serviceName, stageName string, commands []string) error
+
+	// AppendToService appends commands to an existing service stage
+	AppendToService(projectName, serviceName, stageName string, commands []string) error
 }
 
 // viperConfigManager manages configuration using Viper (implementation)
@@ -115,10 +118,15 @@ func (cm *viperConfigManager) GetConfig() *model.Config {
 		config.Projects = make(map[string]*model.Project)
 	}
 
-	// Initialize nil Services maps
+	// Initialize nil Services and Stages maps
 	for _, project := range config.Projects {
 		if project.Services == nil {
 			project.Services = make(map[string]*model.Service)
+		}
+		for _, service := range project.Services {
+			if service.Stages == nil {
+				service.Stages = make(map[string]*model.Stage)
+			}
 		}
 	}
 
@@ -148,7 +156,7 @@ func (cm *viperConfigManager) AddProject(projectName string) error {
 }
 
 // AddService adds a service to an existing project
-func (cm *viperConfigManager) AddService(projectName, serviceName string, commands []string) error {
+func (cm *viperConfigManager) AddService(projectName, serviceName string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
@@ -163,27 +171,59 @@ func (cm *viperConfigManager) AddService(projectName, serviceName string, comman
 		services = make(map[string]interface{})
 	}
 
+	// Check if service already exists
 	if _, exists := services[serviceName]; exists {
 		return fmt.Errorf("service '%s' already exists in project '%s'", serviceName, projectName)
 	}
 
+	// Create new service with empty stages map
 	services[serviceName] = map[string]interface{}{
-		"commands": commands,
+		"stages": make(map[string]interface{}),
 	}
 
 	cm.v.Set(servicesPath, services)
 	return nil
 }
 
-// AppendToService appends commands to an existing service
-func (cm *viperConfigManager) AppendToService(projectName, serviceName string, commands []string) error {
+// AddStage adds a stage to an existing service
+func (cm *viperConfigManager) AddStage(projectName, serviceName, stageName string, commands []string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	commandsPath := fmt.Sprintf("projects.%s.services.%s.commands", projectName, serviceName)
+	servicePath := fmt.Sprintf("projects.%s.services.%s", projectName, serviceName)
+	if !cm.v.IsSet(servicePath) {
+		return fmt.Errorf("service '%s' not found in project '%s'", serviceName, projectName)
+	}
+
+	stagesPath := fmt.Sprintf("%s.stages", servicePath)
+	stages := cm.v.GetStringMap(stagesPath)
+	if stages == nil {
+		stages = make(map[string]interface{})
+	}
+
+	// Check if stage already exists
+	if _, exists := stages[stageName]; exists {
+		return fmt.Errorf("stage '%s' already exists in service '%s.%s'", stageName, projectName, serviceName)
+	}
+
+	// Add new stage
+	stages[stageName] = map[string]interface{}{
+		"commands": commands,
+	}
+
+	cm.v.Set(stagesPath, stages)
+	return nil
+}
+
+// AppendToService appends commands to an existing service stage
+func (cm *viperConfigManager) AppendToService(projectName, serviceName, stageName string, commands []string) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	commandsPath := fmt.Sprintf("projects.%s.services.%s.stages.%s.commands", projectName, serviceName, stageName)
 
 	if !cm.v.IsSet(commandsPath) {
-		return fmt.Errorf("service '%s' not found in project '%s'", serviceName, projectName)
+		return fmt.Errorf("stage '%s' not found in service '%s.%s'", stageName, projectName, serviceName)
 	}
 
 	existingCommands := cm.v.GetStringSlice(commandsPath)
