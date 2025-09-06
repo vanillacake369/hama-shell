@@ -24,7 +24,45 @@ Available subcommands:
   add     - Add a new command to configuration`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand is provided, show help
-		cmd.Help()
+		_ = cmd.Help()
+	},
+}
+
+// configViewCmd represents the config view command
+var configViewCmd = &cobra.Command{
+	Use:   "view",
+	Short: "View command configuration",
+	Long:  `View configuration file`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		manager := config.GetInstance()
+
+		// Check if configuration file exists
+		if !manager.FileExists() {
+			fmt.Println("Configuration file not found!")
+			fmt.Printf("Please create one using: hama-shell config create\n")
+			fmt.Printf("Expected location: %s\n", manager.GetFilePath())
+			return nil
+		}
+
+		// Get and display configuration
+		cfg := manager.GetConfig()
+		if cfg == nil || len(cfg.Projects) == 0 {
+			fmt.Println("Configuration file exists but is empty.")
+			fmt.Printf("Add commands using: hama-shell config add\n")
+			return nil
+		}
+
+		// Convert to YAML and display
+		data, err := yaml.Marshal(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to format configuration: %w", err)
+		}
+
+		fmt.Printf("Configuration file: %s\n", manager.GetFilePath())
+		fmt.Println("=====================================")
+		fmt.Print(string(data))
+
+		return nil
 	},
 }
 
@@ -32,14 +70,7 @@ Available subcommands:
 var configAddCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add a new command to configuration",
-	Long: `Add a new command to be executed in a hama-shell session.
-
-Interactive mode:
-  - Enter command details when prompted
-  - Press Alt+C to cancel at any time
-  - Press Alt+F to finish and save
-
-You can also provide command details via flags for non-interactive mode.`,
+	Long:  `Add a new command to be executed in a hama-shell session.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager := config.GetInstance()
 		// Viper-based so no need to call Load() - already cached in memory
@@ -244,6 +275,7 @@ func processConfigUpdate(manager config.ConfigManager, projectName, serviceName 
 func init() {
 	rootCmd.AddCommand(configCmd)
 
+	configCmd.AddCommand(configViewCmd)
 	configCmd.AddCommand(configAddCmd)
 	configCmd.AddCommand(configCreateCmd)
 }
