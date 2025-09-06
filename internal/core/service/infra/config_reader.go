@@ -1,20 +1,21 @@
 package infra
 
 import (
-	"hama-shell/internal/core/config"
+	config "hama-shell/internal/core/configuration/infra"
+	configModel "hama-shell/internal/core/configuration/model"
 	"hama-shell/internal/core/service/model"
 )
 
 // ConfigReader handles configuration reading operations
 type ConfigReader struct {
-	manager *config.Config
+	manager *configModel.Config
 }
 
 // NewConfigReader creates a new ConfigReader instance
 func NewConfigReader() *ConfigReader {
-	manager := config.GetInstance()
+	configManager := config.GetInstance()
 	return &ConfigReader{
-		manager: manager.GetConfig(),
+		manager: configManager.GetConfig(),
 	}
 }
 
@@ -70,6 +71,6 @@ func (c *ConfigReader) ListAllServices() ([]model.Service, error) {
 
 // GetConfigFilePath returns the configuration file path
 func (c *ConfigReader) GetConfigFilePath() string {
-	manager := config.GetInstance()
-	return manager.GetFilePath()
+	configManager := config.GetInstance()
+	return configManager.GetFilePath()
 }
