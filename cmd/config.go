@@ -42,11 +42,7 @@ Interactive mode:
 You can also provide command details via flags for non-interactive mode.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager := config.GetInstance()
-
-		// Load existing configuration
-		if err := manager.Load(); err != nil {
-			return fmt.Errorf("failed to load configuration: %w", err)
-		}
+		// Viper 기반이므로 Load() 호출 불필요 - 이미 메모리에 캐싱됨
 
 		reader := bufio.NewReader(os.Stdin)
 
@@ -120,16 +116,12 @@ var configCreateCmd = &cobra.Command{
 You can also provide command details via flags for non-interactive mode.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager := config.GetInstance()
+		// Viper 기반이므로 자동으로 초기화됨
 
 		// Check if file already exists
 		if manager.FileExists() {
 			fmt.Println("Configuration file already exists")
 			return nil
-		}
-
-		// Load configuration (will initialize empty config)
-		if err := manager.Load(); err != nil {
-			return fmt.Errorf("failed to initialize configuration: %w", err)
 		}
 
 		// 단계 별로 DTO 로 입력받아 file 저장
