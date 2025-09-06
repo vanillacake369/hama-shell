@@ -31,7 +31,7 @@ type ConfigManager struct {
 	mu       sync.RWMutex
 	filePath string
 
-	// 변경 콜백 (옵션)
+	// change callbacks (optional)
 	onChangeCallbacks []func()
 }
 
@@ -70,18 +70,18 @@ func newConfigManager() *ConfigManager {
 
 // initialize sets up the configuration manager
 func (cm *ConfigManager) initialize() {
-	// 파일이 없으면 빈 config로 초기화
+	// Initialize with empty config if file doesn't exist
 	if !cm.FileExists() {
 		cm.v.Set("projects", make(map[string]interface{}))
 	} else {
-		// 파일이 있으면 로드 (한 번만)
+		// Load file if it exists (once only)
 		if err := cm.v.ReadInConfig(); err != nil {
-			// 에러가 있어도 빈 config로 초기화
+			// Initialize with empty config even if there's an error
 			cm.v.Set("projects", make(map[string]interface{}))
 		}
 	}
 
-	// 파일 변경 감지 설정 (옵션)
+	// Set up file change detection (optional)
 	cm.v.WatchConfig()
 	cm.v.OnConfigChange(func(e fsnotify.Event) {
 		cm.mu.RLock()
@@ -94,10 +94,10 @@ func (cm *ConfigManager) initialize() {
 	})
 }
 
-// Load reads configuration - Viper에서는 이미 메모리에 있으므로 no-op
+// Load reads configuration - Viper already has it in memory so this is a no-op
 func (cm *ConfigManager) Load() error {
-	// Viper는 자동으로 캐싱하므로 별도 로드 불필요
-	// 하위 호환성을 위해 메서드는 유지
+	// Viper automatically caches so no separate load is needed
+	// Method is maintained for backward compatibility
 	return nil
 }
 
@@ -114,13 +114,13 @@ func (cm *ConfigManager) Save() error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	// 디렉토리가 없으면 생성
+	// Create directory if it doesn't exist
 	dir := filepath.Dir(cm.filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Viper의 WriteConfigAs를 사용하여 파일 저장
+	// Save file using Viper's WriteConfigAs
 	return cm.v.WriteConfigAs(cm.filePath)
 }
 
@@ -140,7 +140,7 @@ func (cm *ConfigManager) GetConfig() *Config {
 		config.Projects = make(map[string]*Project)
 	}
 
-	// nil Services 맵 초기화
+	// Initialize nil Services maps
 	for _, project := range config.Projects {
 		if project.Services == nil {
 			project.Services = make(map[string]*Service)
@@ -244,7 +244,7 @@ func (cm *ConfigManager) DeleteProject(projectName string) error {
 		return fmt.Errorf("project '%s' not found", projectName)
 	}
 
-	// Viper에서 키 삭제
+	// Delete key from Viper
 	projects := cm.v.GetStringMap("projects")
 	delete(projects, projectName)
 	cm.v.Set("projects", projects)

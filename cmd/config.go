@@ -42,7 +42,7 @@ Interactive mode:
 You can also provide command details via flags for non-interactive mode.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager := config.GetInstance()
-		// Viper 기반이므로 Load() 호출 불필요 - 이미 메모리에 캐싱됨
+		// Viper-based so no need to call Load() - already cached in memory
 
 		reader := bufio.NewReader(os.Stdin)
 
@@ -116,7 +116,7 @@ var configCreateCmd = &cobra.Command{
 You can also provide command details via flags for non-interactive mode.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager := config.GetInstance()
-		// Viper 기반이므로 자동으로 초기화됨
+		// Viper-based so automatically initialized
 
 		// Check if file already exists
 		if manager.FileExists() {
@@ -124,7 +124,7 @@ You can also provide command details via flags for non-interactive mode.`,
 			return nil
 		}
 
-		// 단계 별로 DTO 로 입력받아 file 저장
+		// Get input step by step via DTO and save to file
 		reader := bufio.NewReader(os.Stdin)
 
 		fmt.Println("Creating new hama-shell configuration")
