@@ -25,8 +25,8 @@ type Session struct {
 	TTYDevice string        `json:"tty_device,omitempty"`
 }
 
-// Manager interface for managing sessions
-type Manager interface {
+// SessionManager interface for managing sessions
+type SessionManager interface {
 	// List returns all sessions
 	List() ([]Session, error)
 

@@ -212,7 +212,7 @@ func displayConfig(cfg *config.Config) {
 }
 
 // processConfigUpdate handles adding/updating configuration based on existence
-func processConfigUpdate(manager *config.ConfigManager, projectName, serviceName string, commands []string, projectExists, serviceExists bool) error {
+func processConfigUpdate(manager config.ConfigManager, projectName, serviceName string, commands []string, projectExists, serviceExists bool) error {
 	switch {
 	case !projectExists:
 		// Create new project and service
