@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"slices"
 
 	"github.com/spf13/cobra"
 )
@@ -40,27 +39,6 @@ var rootCmd = &cobra.Command{
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	// Handle dynamic session commands before executing
-	args := os.Args[1:]
-	if len(args) > 0 {
-		// Check if the first argument might be a session ID
-		firstArg := args[0]
-
-		// Skip if it's a known command
-		knownCommands := []string{"list", "ls", "config", "help", "completion", "--help", "-h", "--version", "-v"}
-		isKnownCommand := slices.Contains(knownCommands, firstArg)
-
-		// If it's not a known command, treat it as a session ID
-		if !isKnownCommand {
-			err := handleDynamicSession(rootCmd, args)
-			if err != nil {
-				_, _ = fmt.Fprintln(os.Stderr, "Error:", err)
-				os.Exit(1)
-			}
-			return
-		}
-	}
-
 	err := rootCmd.Execute()
 	if err != nil {
 		os.Exit(1)
