@@ -21,66 +21,94 @@ HamaShell is currently in active development with a focus on core functionality.
 
 ### ✅ Implemented Components
 
-#### 1. Process Executor (`internal/core/executor/`)
-A lightweight, thread-safe process executor with hierarchical key-based management:
-- **Simple API**: `Run()`, `StopAll()`, `StopByKey()`, and `GetStatus()`
-- **Thread-safe operations**: Uses `sync.Map` for concurrent access
-- **Hierarchical keys**: Organizes processes by project.stage.service pattern
-- **Platform-aware**: Proper signal handling for Unix/Linux (SIGTERM/SIGKILL) and Windows
-- **Process isolation**: Uses process groups for better management
+#### 1. Clean Architecture Foundation (`internal/core/`)
+Domain-driven design with clear separation of concerns:
+- **Domain separation**: Configuration, Service, Session, and Terminal domains
+- **Layer separation**: API-Infrastructure-Model pattern per domain
+- **Dependency inversion**: Interfaces define contracts between layers
+- **Single responsibility**: Each domain handles specific business concerns
 
-#### 2. Configuration System (`internal/core/config/`)
-YAML-based configuration with validation:
-- **Config Validator**: Parses and validates YAML configuration files
-- **Type-safe structures**: Well-defined Go structs for configuration
-- **Environment variable support**: Integration with system environment
-- **Error handling**: Clear error messages for configuration issues
+#### 2. Configuration Domain (`internal/core/configuration/`)
+Complete configuration management system:
+- **API Layer**: Configuration operation interfaces for dependency inversion
+- **Infrastructure Layer**: Viper-based configuration management with file handling
+- **Model Layer**: Type-safe configuration structures with validation
+- **Project-Service-Stage hierarchy**: Flexible configuration organization
 
-#### 3. CLI Framework (`cmd/`)
-Cobra-based command-line interface:
-- **Root Command**: Base command with configuration loading
-- **Start Command**: Session start operations
-- **Stop Command**: Session stop operations  
-- **Status Command**: Session status monitoring
-- **Config Command**: Configuration management
+#### 3. Service Domain (`internal/core/service/`)
+Service definition and management:
+- **API Layer**: Service management interfaces
+- **Infrastructure Layer**: Config reading and terminal management
+- **Model Layer**: Service validation, session tracking, and error handling
+- **Business logic**: Service naming conventions and validation rules
+
+#### 4. Session Domain (`internal/core/session/`)
+Session lifecycle management:
+- **API Layer**: Session operation interfaces
+- **Infrastructure Layer**: Session persistence and process management
+- **Model Layer**: Session information and filtering capabilities
+
+#### 5. Terminal Domain (`internal/core/terminal/`)
+Terminal session handling for interactive processes:
+- **Client/Server architecture**: Separation of terminal client and server concerns
+- **Interactive session support**: Foundation for terminal multiplexer integration
+
+#### 6. CLI Framework (`cmd/`)
+Comprehensive command-line interface:
+- **Root Command**: Base `hs` command with version support
+- **Config Commands**: Configuration management (show, validate, set)
+- **List Command**: Service listing and discovery
+- **Service Commands**: Service lifecycle management (start, info)
 
 ### 🚧 In Progress
-- Session state management and persistence
-- Enhanced error handling and recovery
-- Configuration file generation and management
+- Service session execution and terminal integration
+- Session persistence and state management
+- Terminal client/server implementation
+- Process monitoring and lifecycle management
 
 ### 📋 Planned Features
-- SSH connection management
-- Port forwarding and tunneling
-- Terminal multiplexer integration
-- Interactive TUI mode
-- Shell completion scripts
+- SSH connection management and tunneling
+- Interactive terminal attachment and detachment
+- Process health monitoring and auto-restart
+- Configuration file generation tools
+- Shell completion scripts and TUI mode
 
 ## Project Structure
 
 ```
 hama-shell/
-├── main.go                    # Application entry point
-├── go.mod                     # Go module definition  
-├── cmd/                       # CLI command implementations
-│   ├── root.go               # Root command with config loading
-│   ├── start.go              # Start command
-│   ├── stop.go               # Stop command
-│   ├── status.go             # Status command
-│   └── config.go             # Config command
-├── internal/                  # Internal packages
-│   └── core/                 # Core components
-│       ├── executor/         # Process execution management
-│       │   ├── executor.go           # Main executor implementation
-│       │   ├── process_common.go     # Shared types and interfaces
-│       │   ├── process_unix.go       # Unix-specific process handling
-│       │   ├── process_windows.go    # Windows-specific process handling
-│       │   └── README.md             # Executor documentation
-│       └── config/           # Configuration management
-│           ├── validator.go          # Config parsing and validation
-│           └── validator_test.go     # Config validation tests
-├── docs/                     # Documentation
-└── example.yaml              # Example configuration file
+├── main.go                           # Application entry point
+├── go.mod                           # Go module definition  
+├── Makefile                         # Build automation
+├── cmd/                             # CLI command implementations
+│   ├── root.go                     # Root command (hs)
+│   ├── config.go                   # Configuration commands
+│   ├── list.go                     # List services command
+│   └── service.go                  # Service management commands
+├── internal/core/                   # Core domains (Clean Architecture)
+│   ├── configuration/              # Configuration domain
+│   │   ├── api/config_api.go      # Configuration API interface
+│   │   ├── infra/                 # Infrastructure implementations
+│   │   │   ├── config_manager.go  # Configuration management
+│   │   │   └── viper_config.go    # Viper-based config handling
+│   │   └── model/                 # Configuration domain models
+│   │       └── configuration.go   # Config structures & validation
+│   ├── service/                    # Service domain  
+│   │   ├── api/service_api.go     # Service API interface
+│   │   ├── infra/                 # Infrastructure implementations
+│   │   │   ├── config_reader.go   # Service config reading
+│   │   │   └── terminal_manager.go # Terminal session management
+│   │   └── model/                 # Service domain models
+│   │       ├── service.go         # Service structures & validation
+│   │       └── errors.go          # Service-specific errors
+│   ├── session/                    # Session domain
+│   │   ├── api/session_api.go     # Session API interface  
+│   │   ├── infra/session_manager.go # Session management implementation
+│   │   ├── model/session.go       # Session domain models
+│   │   └── session_manager.go     # Session manager
+│   └── terminal/                   # Terminal domain
+│       ├── client.go              # Terminal client
+│       └── server.go              # Terminal server
 ```
 
 ## Configuration Format
@@ -90,25 +118,27 @@ HamaShell uses a simple YAML-based configuration format:
 ```yaml
 projects:
   myapp:
-    description: "Main application project"
-    stages:
-      dev:
-        services:
-          database:
-            description: "Development database connection"
+    services:
+      database:
+        stages:
+          dev:
             commands:
               - "ssh -i ${SSH_KEY_PATH} ${DB_USER}@dev-db.example.com"
               - "mysql -u root -p${DB_PASSWORD}"
-          api:
-            description: "Development API server"
+          prod:
+            commands:
+              - "ssh -i ${SSH_KEY_PATH} ${DB_USER}@prod-db.example.com"
+              - "mysql -u root -p${PROD_DB_PASSWORD}"
+      api:
+        stages:
+          dev:
             commands:
               - "ssh -i ${SSH_KEY_PATH} ${API_USER}@dev-api.example.com"
               - "cd /app && npm start"
-
-global_settings:
-  timeout: 30
-  retries: 3  
-  auto_restart: true
+          prod:
+            commands:
+              - "ssh -i ${SSH_KEY_PATH} ${API_USER}@prod-api.example.com"
+              - "cd /app && npm start"
 ```
 
 ## Development Methodology
@@ -208,29 +238,36 @@ go get <package>            # Add new dependency
 
 ## Future Roadmap
 
-### Phase 1: Core Functionality (Current)
-- ✅ Process executor with hierarchical management
-- ✅ Basic CLI structure
-- ✅ Configuration validation
-- 🚧 Session persistence
-- 🚧 Enhanced error handling
+### Phase 1: Architecture Foundation (Current)
+- ✅ Clean Architecture implementation with domain separation
+- ✅ Configuration domain with Viper integration
+- ✅ Service domain with validation and session tracking
+- ✅ CLI framework with config, list, and service commands
+- 🚧 Session execution and terminal integration
+- 🚧 Terminal client/server implementation
 
-### Phase 2: Connection Management  
-- SSH client implementation
-- Port forwarding and tunneling
-- Connection health monitoring
-- Automatic retry logic
+### Phase 2: Session Management  
+- Terminal session persistence and state management
+- Process lifecycle management and monitoring
+- Interactive session attachment and detachment
+- Session filtering and discovery
 
-### Phase 3: Advanced Features
+### Phase 3: Connection Features
+- SSH client implementation and tunneling
+- Port forwarding and connection health monitoring
+- Connection configuration templates
+- Automatic retry and reconnection logic
+
+### Phase 4: Advanced Features
 - Terminal multiplexer integration (tmux, zellij)
-- Interactive TUI mode
-- Shell completion scripts
-- Configuration generation tools
+- Interactive TUI mode for session management
+- Shell completion scripts and configuration helpers
+- Configuration file generation and validation tools
 
-### Phase 4: Polish & Distribution
-- Comprehensive documentation
-- Installation packages
-- CI/CD pipeline
-- Performance optimization
+### Phase 5: Polish & Distribution
+- Comprehensive documentation and examples
+- Installation packages and distribution
+- CI/CD pipeline and automated testing
+- Performance optimization and monitoring
 
-This roadmap ensures steady progress toward the full vision while maintaining a stable, usable tool at each phase.
+This roadmap ensures steady progress toward the full vision while maintaining a stable, usable tool at each phase with proper Clean Architecture foundations.
