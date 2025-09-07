@@ -2,11 +2,10 @@ package api
 
 import (
 	"fmt"
+	"hama-shell/internal/session/infra"
+	"hama-shell/internal/session/model"
 	"os"
 	"text/tabwriter"
-
-	"hama-shell/internal/core/session/infra"
-	"hama-shell/internal/core/session/model"
 )
 
 // SessionAPI provides high-level session operations
@@ -62,7 +61,7 @@ func (api *SessionAPI) ListSessions(showAll bool, statusFilter string) error {
 
 	// Show session count
 	fmt.Printf("\nTotal sessions: %d\n", len(sessions))
-	
+
 	if statusFilter != "" {
 		fmt.Printf("(Filtered by status: %s)\n", statusFilter)
 	}

@@ -2,7 +2,7 @@ package infra
 
 import (
 	"fmt"
-	"hama-shell/internal/core/configuration/model"
+	"hama-shell/internal/configuration/model"
 
 	"gopkg.in/yaml.v3"
 )

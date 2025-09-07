@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	"hama-shell/internal/configuration/api"
+
 	"github.com/spf13/cobra"
-	
-	"hama-shell/internal/core/configuration/api"
 )
 
 // configCmd represents the config command
@@ -57,7 +57,6 @@ You can also provide command details via flags for non-interactive mode.`,
 		return configAPI.CreateConfiguration()
 	},
 }
-
 
 func init() {
 	rootCmd.AddCommand(configCmd)

@@ -1,12 +1,11 @@
 package cmd
 
 import (
+	"hama-shell/internal/service/api"
 	"log"
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"hama-shell/internal/core/service/api"
 )
 
 // serviceCmd represents the service command

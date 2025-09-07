@@ -1,9 +1,9 @@
 package infra
 
 import (
-	config "hama-shell/internal/core/configuration/infra"
-	configModel "hama-shell/internal/core/configuration/model"
-	"hama-shell/internal/core/service/model"
+	config "hama-shell/internal/configuration/infra"
+	configModel "hama-shell/internal/configuration/model"
+	model2 "hama-shell/internal/service/model"
 )
 
 // ConfigReader handles configuration reading operations
@@ -20,29 +20,29 @@ func NewConfigReader() *ConfigReader {
 }
 
 // GetService retrieves a specific service configuration
-func (c *ConfigReader) GetService(projectName, serviceName, stageName string) (*model.Service, error) {
+func (c *ConfigReader) GetService(projectName, serviceName, stageName string) (*model2.Service, error) {
 	cfg := c.manager
 
 	// Find project
 	project, exists := cfg.Projects[projectName]
 	if !exists {
-		return nil, model.ErrServiceNotFound
+		return nil, model2.ErrServiceNotFound
 	}
 
 	// Find service
 	serviceConfig, exists := project.Services[serviceName]
 	if !exists {
-		return nil, model.ErrServiceNotFound
+		return nil, model2.ErrServiceNotFound
 	}
 
 	// Find stage
 	stageConfig, exists := serviceConfig.Stages[stageName]
 	if !exists {
-		return nil, model.ErrServiceNotFound
+		return nil, model2.ErrServiceNotFound
 	}
 
 	// Create service model
-	service := &model.Service{
+	service := &model2.Service{
 		ProjectName: projectName,
 		ServiceName: serviceName,
 		StageName:   stageName,
@@ -58,14 +58,14 @@ func (c *ConfigReader) GetService(projectName, serviceName, stageName string) (*
 }
 
 // ListAllServices returns all available services
-func (c *ConfigReader) ListAllServices() ([]model.Service, error) {
+func (c *ConfigReader) ListAllServices() ([]model2.Service, error) {
 	cfg := c.manager
-	var services []model.Service
+	var services []model2.Service
 
 	for projectName, project := range cfg.Projects {
 		for serviceName, serviceConfig := range project.Services {
 			for stageName, stageConfig := range serviceConfig.Stages {
-				service := model.Service{
+				service := model2.Service{
 					ProjectName: projectName,
 					ServiceName: serviceName,
 					StageName:   stageName,

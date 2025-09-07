@@ -2,22 +2,21 @@ package api
 
 import (
 	"fmt"
-
-	"hama-shell/internal/core/service/infra"
-	"hama-shell/internal/core/service/model"
+	infra2 "hama-shell/internal/service/infra"
+	"hama-shell/internal/service/model"
 )
 
 // ServiceAPI provides high-level service operations
 type ServiceAPI struct {
-	configReader *infra.ConfigReader
-	terminalMgr  *infra.TerminalManager
+	configReader *infra2.ConfigReader
+	terminalMgr  *infra2.TerminalManager
 }
 
 // NewServiceAPI creates a new ServiceAPI instance
 func NewServiceAPI() *ServiceAPI {
 	return &ServiceAPI{
-		configReader: infra.NewConfigReader(),
-		terminalMgr:  infra.NewTerminalManager(),
+		configReader: infra2.NewConfigReader(),
+		terminalMgr:  infra2.NewTerminalManager(),
 	}
 }
 

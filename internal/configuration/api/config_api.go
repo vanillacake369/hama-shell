@@ -3,11 +3,10 @@ package api
 import (
 	"bufio"
 	"fmt"
+	"hama-shell/internal/configuration/infra"
+	"hama-shell/internal/configuration/model"
 	"os"
 	"strings"
-
-	"hama-shell/internal/core/configuration/infra"
-	"hama-shell/internal/core/configuration/model"
 )
 
 // ConfigAPI provides high-level configuration operations

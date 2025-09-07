@@ -2,12 +2,12 @@ package infra
 
 import (
 	"fmt"
+	"hama-shell/internal/configuration/model"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/spf13/viper"
-	"hama-shell/internal/core/configuration/model"
 )
 
 // ConfigManager interface for managing configuration

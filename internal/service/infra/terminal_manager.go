@@ -2,6 +2,7 @@ package infra
 
 import (
 	"fmt"
+	"hama-shell/internal/service/model"
 	"io"
 	"os"
 	"os/signal"
@@ -11,7 +12,6 @@ import (
 	"github.com/creack/pty"
 	"golang.org/x/term"
 
-	"hama-shell/internal/core/service/model"
 	"hama-shell/internal/core/terminal"
 )
 
