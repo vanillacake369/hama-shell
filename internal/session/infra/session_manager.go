@@ -51,51 +51,5 @@ func (sm *SessionManager) ListSessions(filter model.SessionFilter) ([]model.Sess
 		result = append(result, sessionInfo)
 	}
 
-	// If no real sessions, return demo data for now
-	// TODO: Remove this when terminal server is fully integrated
-	if len(result) == 0 {
-		result = sm.getDemoSessions(filter)
-	}
-
 	return result, nil
-}
-
-// getDemoSessions returns demo sessions for testing
-func (sm *SessionManager) getDemoSessions(filter model.SessionFilter) []model.SessionInfo {
-	demoSessions := []model.SessionInfo{
-		{
-			ID:        "web-server",
-			Status:    "running",
-			StartTime: time.Now().Add(-2 * time.Hour),
-			Command:   "npm run dev",
-		},
-		{
-			ID:        "db-backup",
-			Status:    "running",
-			StartTime: time.Now().Add(-5 * time.Hour),
-			Command:   "pg_dump mydb > backup.sql",
-		},
-		{
-			ID:        "worker-1",
-			Status:    "stopped",
-			StartTime: time.Now().Add(-8 * time.Hour),
-			Command:   "python worker.py",
-		},
-	}
-
-	var result []model.SessionInfo
-	for _, session := range demoSessions {
-		// Apply filter
-		if filter.Status != "" && session.Status != filter.Status {
-			continue
-		}
-
-		if !filter.ShowAll && session.Status == "stopped" {
-			continue
-		}
-
-		result = append(result, session)
-	}
-
-	return result
 }

@@ -7,6 +7,33 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ConfigManager interface for managing configuration
+type ConfigManager interface {
+	// GetConfig returns the current configuration
+	GetConfig() *model.Config
+
+	// Save writes the current configuration to file
+	Save() error
+
+	// FileExists checks if the configuration file exists
+	FileExists() bool
+
+	// GetFilePath returns the configuration file path
+	GetFilePath() string
+
+	// AddProject adds a new project to the configuration
+	AddProject(projectName string) error
+
+	// AddService adds a service to an existing project
+	AddService(projectName, serviceName string) error
+
+	// AddStage adds a stage to an existing service
+	AddStage(projectName, serviceName, stageName string, commands []string) error
+
+	// AppendToService appends commands to an existing service stage
+	AppendToService(projectName, serviceName, stageName string, commands []string) error
+}
+
 // ConfigManagerWrapper handles configuration file operations
 type ConfigManagerWrapper struct {
 	manager ConfigManager
