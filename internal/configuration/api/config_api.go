@@ -11,7 +11,7 @@ import (
 
 // ConfigAPI provides high-level configuration operations
 type ConfigAPI struct {
-	configMgr *infra.ConfigManagerWrapper
+	configMgr infra.ConfigManager
 	reader    *bufio.Reader
 }
 
@@ -177,6 +177,7 @@ func (api *ConfigAPI) AddToConfiguration() error {
 }
 
 // readCommands reads commands from user input until empty line
+// ToDo : 여기서 아래와 같이 \ 로 구분된 여러 줄의 명령어는 입력이 안 되네 ㅠ 왜 ?
 func (api *ConfigAPI) readCommands() []string {
 	fmt.Println("Enter commands (one per line, empty line to finish):")
 	var commands []string
