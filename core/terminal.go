@@ -1,14 +1,15 @@
 package core
 
 import (
-	"errors"
 	"github.com/creack/pty"
 	"golang.org/x/term"
 	"io"
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 )
 
 func ConnectTerminalEmulator() {
@@ -58,6 +59,25 @@ func ConnectTerminalEmulator() {
 		_, _ = io.Copy(ptyMaster, os.Stdin)
 	}()
 
+	// TODO : 명령어를 전달 (테스트용)
+	// Note: goroutine이 시작된 후 명령어를 전송해야 출력이 올바르게 표시됨
+	// Shell 초기화를 위한 짧은 대기 시간
+	commands := []string{
+		"ls",
+		"whoami",
+		"neofetch",
+	}
+	go func() {
+		// Shell 이 완전히 초기화될 때까지 대기
+		// 대기하지 않으면 명령어 전달을 초기화 이전에 전달하게 되어
+		// 부모에게 전달하게 될 수 있음
+		time.Sleep(500 * time.Millisecond)
+
+		for _, command := range commands {
+			_, _ = io.Copy(ptyMaster, strings.NewReader(command+"\n"))
+		}
+	}()
+
 	// 시그널을 통해 PTY 윈도우 크기 변경
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGWINCH)
@@ -77,11 +97,4 @@ func ConnectTerminalEmulator() {
 
 	// 자식 프로세스가 종료될 때까지 블로킹하며 대기
 	err = childProcess.Wait()
-	if err != nil {
-		// exit code가 0이 아닌 경우에만 에러
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			os.Exit(exitErr.ExitCode())
-		}
-	}
 }
