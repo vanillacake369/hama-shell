@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func ConnectTerminalEmulator() {
+func ConnectTerminalEmulator(commands []string) {
 	// PTY 쌍 생성
 	ptyMaster, ptySlave, err := pty.Open()
 	if err != nil {
@@ -50,23 +50,9 @@ func ConnectTerminalEmulator() {
 	// 부모 프로세스는 PTY Slave 를 닫는다
 	_ = ptySlave.Close()
 
-	// PTY Master -> 현재 세션의 stdout (화면에 표시)
-	// 현재 세션의 stdin -> PTY Master (입력을 PTY 에 전달하여 가상의 shell 에 전달)
-	go func() {
-		_, _ = io.Copy(os.Stdout, ptyMaster)
-	}()
-	go func() {
-		_, _ = io.Copy(ptyMaster, os.Stdin)
-	}()
-
 	// TODO : 명령어를 전달 (테스트용)
 	// Note: goroutine이 시작된 후 명령어를 전송해야 출력이 올바르게 표시됨
 	// Shell 초기화를 위한 짧은 대기 시간
-	commands := []string{
-		"ls",
-		"whoami",
-		"neofetch",
-	}
 	go func() {
 		// Shell 이 완전히 초기화될 때까지 대기
 		// 대기하지 않으면 명령어 전달을 초기화 이전에 전달하게 되어
@@ -75,7 +61,20 @@ func ConnectTerminalEmulator() {
 
 		for _, command := range commands {
 			_, _ = io.Copy(ptyMaster, strings.NewReader(command+"\n"))
+			// TODO
+			//		명령어가 PTY 에 너무 빨리 보내져서 부모가 출력해버리는 경우가 발생함
+			//		이에 따라 처리한 명령어가 완전히 성공해야 다음 명령어가 처리되도록 해야함
+			//		ptyMaster 의 stdout 이 idle 하면 성공했다고 판단하면 되지 않을까?
 		}
+	}()
+
+	// PTY Master -> 현재 세션의 stdout (화면에 표시)
+	// 현재 세션의 stdin -> PTY Master (입력을 PTY 에 전달하여 가상의 shell 에 전달)
+	go func() {
+		_, _ = io.Copy(os.Stdout, ptyMaster)
+	}()
+	go func() {
+		_, _ = io.Copy(ptyMaster, os.Stdin)
 	}()
 
 	// 시그널을 통해 PTY 윈도우 크기 변경
