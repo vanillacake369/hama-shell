@@ -3,12 +3,9 @@ profiles:
     project: A
     stage: dev
     steps:
-      - type: self-ssh
+      - type: test
         actions:
-          - cp {SSH_A_DOTFILE}/config ~/.ssh/config
-      - type: connect
-        actions:
-          - ssh A_dev
-      - type: deploy
-        actions:
-          - ansible-playbook {SSH_A_DOTFILE}/dev_migration.yml
+          - ls
+          - neofetch
+          - pwd
+          - echo 'This is child process tested via hama-shell'
