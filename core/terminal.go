@@ -1,8 +1,6 @@
 package core
 
 import (
-	"github.com/creack/pty"
-	"golang.org/x/term"
 	"io"
 	"os"
 	"os/exec"
@@ -10,30 +8,64 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/creack/pty"
+	"golang.org/x/term"
 )
 
 func ConnectTerminalEmulator(commands []string) {
-	// PTY 쌍 생성
-	ptyMaster, ptySlave, err := pty.Open()
-	if err != nil {
-		return
-	}
+	ptyMaster, ptySlave := initializePTY()
 	defer func(ptyMaster *os.File) {
 		_ = ptyMaster.Close()
 	}(ptyMaster)
-	// PTY 크기를 현재 터미널 크기로 설정
+
+	oldState := enableRawMode()
+	defer func() {
+		if oldState != nil {
+			_ = term.Restore(int(os.Stdin.Fd()), oldState)
+		}
+	}()
+
+	childProcess := startShellProcess(ptySlave)
+	_ = ptySlave.Close()
+
+	executeCommands(ptyMaster, commands)
+	setupIOStreaming(ptyMaster)
+	setupWindowResizeHandler(ptyMaster)
+
+	_ = childProcess.Wait()
+}
+
+// initializePTY PTY 쌍을 생성하고 설정
+func initializePTY() (*os.File, *os.File) {
+	ptyMaster, ptySlave, err := pty.Open()
+	if err != nil {
+		panic(err)
+	}
+
 	winSize, _ := pty.GetsizeFull(os.Stdin)
 	_ = pty.Setsize(ptyMaster, winSize)
 
-	// 사용자의 입력을 PTY 에 전달하고자 부모의 stdin 에 대해 RAW MODE 활성화
+	return ptyMaster, ptySlave
+}
+
+// enableRawMode 사용자의 입력을 PTY 에 직접 전달하기 위해 stdin 을 RAW MODE 로 활성화
+func enableRawMode() *term.State {
+	// stdin 이 터미널인지 확인
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		// stdin 이 터미널이 아니면 nil 반환 (raw mode 불필요)
+		return nil
+	}
+
 	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		panic(err)
 	}
-	defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }()
+	return oldState
+}
 
-	// 자식 프로세스 생성
-	// sid 를 지정하여 현재 세션으로부터 분리
+// startShellProcess PTY 에 연결된 자식 쉘 프로세스를 생성하고 시작
+func startShellProcess(ptySlave *os.File) *exec.Cmd {
 	childProcess := exec.Command(os.Getenv("SHELL"))
 	childProcess.SysProcAttr = &syscall.SysProcAttr{
 		Setsid:  true,
@@ -42,17 +74,17 @@ func ConnectTerminalEmulator(commands []string) {
 	childProcess.Stdin = ptySlave
 	childProcess.Stdout = ptySlave
 	childProcess.Stderr = ptySlave
-	err = childProcess.Start()
+
+	err := childProcess.Start()
 	if err != nil {
 		panic(err)
 	}
 
-	// 부모 프로세스는 PTY Slave 를 닫는다
-	_ = ptySlave.Close()
+	return childProcess
+}
 
-	// TODO : 명령어를 전달 (테스트용)
-	// Note: goroutine이 시작된 후 명령어를 전송해야 출력이 올바르게 표시됨
-	// Shell 초기화를 위한 짧은 대기 시간
+// executeCommands 초기화 지연 후 쉘에 명령어를 전송
+func executeCommands(ptyMaster *os.File, commands []string) {
 	go func() {
 		// Shell 이 완전히 초기화될 때까지 대기
 		// 대기하지 않으면 명령어 전달을 초기화 이전에 전달하게 되어
@@ -67,24 +99,32 @@ func ConnectTerminalEmulator(commands []string) {
 			//		ptyMaster 의 stdout 이 idle 하면 성공했다고 판단하면 되지 않을까?
 		}
 	}()
+}
 
+// setupIOStreaming PTY 와 현재 세션 간의 양방향 I/O 설정
+func setupIOStreaming(ptyMaster *os.File) {
 	// PTY Master -> 현재 세션의 stdout (화면에 표시)
-	// 현재 세션의 stdin -> PTY Master (입력을 PTY 에 전달하여 가상의 shell 에 전달)
 	go func() {
 		_, _ = io.Copy(os.Stdout, ptyMaster)
 	}()
+
+	// 현재 세션의 stdin -> PTY Master (입력을 PTY 에 전달하여 가상의 shell 에 전달)
 	go func() {
 		_, _ = io.Copy(ptyMaster, os.Stdin)
 	}()
+}
 
-	// 시그널을 통해 PTY 윈도우 크기 변경
+// setupWindowResizeHandler 터미널 윈도우 크기 변경 시그널 처리
+func setupWindowResizeHandler(ptyMaster *os.File) {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGWINCH)
-	defer func() {
-		signal.Stop(signalChan)
-		close(signalChan)
-	}()
+
 	go func() {
+		defer func() {
+			signal.Stop(signalChan)
+			close(signalChan)
+		}()
+
 		for sig := range signalChan {
 			if sig == syscall.SIGWINCH {
 				if winSize, err := pty.GetsizeFull(os.Stdin); err == nil {
@@ -93,7 +133,4 @@ func ConnectTerminalEmulator(commands []string) {
 			}
 		}
 	}()
-
-	// 자식 프로세스가 종료될 때까지 블로킹하며 대기
-	err = childProcess.Wait()
 }
