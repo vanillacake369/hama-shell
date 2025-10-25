@@ -1,0 +1,14 @@
+profiles:
+  - name: project-a-dev
+    project: A
+    stage: dev
+    steps:
+      - type: self-ssh
+        actions:
+          - cp {SSH_A_DOTFILE}/config ~/.ssh/config
+      - type: connect
+        actions:
+          - ssh A_dev
+      - type: deploy
+        actions:
+          - ansible-playbook {SSH_A_DOTFILE}/dev_migration.yml
