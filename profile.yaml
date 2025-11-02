@@ -1,11 +1,38 @@
 profiles:
-  - name: project-a-dev
-    project: A
-    stage: dev
-    steps:
-      - type: test
-        actions:
-          - ls
-          - neofetch
-          - pwd
-          - echo 'This is child process tested via hama-shell'
+  project-a:
+    dev:
+      steps:
+        - type: test-01
+          actions:
+            - ls
+            - neofetch
+            - pwd
+            - echo 'This is child process tested via hama-shell'
+        - type: test-02
+          actions:
+            - ls
+            - haha
+    prod:
+      steps:
+        - type: deploy
+          actions:
+            - kubectl apply -f prod.yaml
+            - echo 'Deploying to production'
+
+  project-b:
+    dev:
+      steps:
+        - type: test-01
+          actions:
+            - ls
+            - neofetch
+            - pwd
+        - type: build
+          actions:
+            - go build -o app
+            - docker build -t project-b:dev .
+    staging:
+      steps:
+        - type: deploy
+          actions:
+            - kubectl apply -f staging.yaml
