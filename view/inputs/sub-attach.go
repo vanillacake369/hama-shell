@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hama-shell/controller"
 	"hama-shell/core"
+	"hama-shell/global"
 
 	"github.com/spf13/cobra"
 )
@@ -15,13 +16,13 @@ var attachCmd = &cobra.Command{
 	Long:    "지정한 세션의 터미널에 접속합니다.",
 	Run: func(cmd *cobra.Command, args []string) {
 		// flag 로 넘겨받은 프로젝트, 스테이지명
-		project, _ := cmd.Flags().GetString("project")
-		stage, _ := cmd.Flags().GetString("stage")
+		project, _ := cmd.Flags().GetString(global.FlagProject)
+		stage, _ := cmd.Flags().GetString(global.FlagStage)
 
 		fmt.Printf("프로젝트 %s 의 스테이지 %s 에 접속합니다...\n", project, stage)
 
-		// TODO : "" 으로 선언된 magic value 를 어떻게 하면 피할 수 있지 ??
-		config, err := core.LoadProfileConfig("profile.yaml")
+		// 프로필 설정 로드
+		config, err := core.LoadProfileConfig(global.GetProfileConfigPath())
 		if err != nil {
 			fmt.Printf("Failed to load profile: %v\n", err)
 			return
@@ -44,7 +45,17 @@ var attachCmd = &cobra.Command{
 
 func init() {
 	// attach 명령어에 필수 flag 추가
-	attachCmd.Flags().StringP("project", "p", "", "프로젝트 이름 (필수)")
-	attachCmd.Flags().StringP("stage", "s", "dev", "스테이지 이름 (기본값: dev)")
-	attachCmd.MarkFlagRequired("project")
+	attachCmd.Flags().StringP(
+		global.FlagProject,
+		global.FlagProjectShort,
+		"",
+		"프로젝트 이름 (필수)",
+	)
+	attachCmd.Flags().StringP(
+		global.FlagStage,
+		global.FlagStageShort,
+		global.DefaultStage,
+		fmt.Sprintf("스테이지 이름 (기본값: %s)", global.DefaultStage),
+	)
+	attachCmd.MarkFlagRequired(global.FlagProject)
 }

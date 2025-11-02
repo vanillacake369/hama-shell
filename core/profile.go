@@ -2,7 +2,9 @@ package core
 
 import (
 	"fmt"
+	"hama-shell/global"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -107,15 +109,18 @@ func (s *Stage) GetAllActions() []string {
 }
 
 // SyncProfile profile.yaml 파일 변경을 감지하고 동기화 (viper 사용)
+// TODO : 예시용도이므로 수정되어야 함 !!
 func SyncProfile() {
-	fmt.Println("Starting profile.yaml watcher...")
+	configPath := global.GetProfileConfigPath()
+	fmt.Printf("Starting %s watcher...\n", configPath)
 	fmt.Println("Press Ctrl+C to exit")
 	fmt.Println()
 
 	// Viper 설정
-	viper.SetConfigName("profile")
+	configName := strings.TrimSuffix(global.ProfileConfigFileName, ".yaml")
+	viper.SetConfigName(configName)
 	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+	viper.AddConfigPath(global.GetConfigDir())
 
 	// 초기 설정 읽기
 	if err := viper.ReadInConfig(); err != nil {
@@ -143,7 +148,7 @@ func SyncProfile() {
 
 func printProfile() {
 	// LoadProfileConfig를 사용하여 로드
-	config, err := LoadProfileConfig("profile.yaml")
+	config, err := LoadProfileConfig(global.GetProfileConfigPath())
 	if err != nil {
 		log.Printf("Error loading profile: %v", err)
 		return
